@@ -40,10 +40,11 @@ jobs:
           echo "API responded with HTTP code: $http_response_code"
           echo "Response body (first 500 characters):"
           head -c 500 /tmp/api_smoke_test_response.txt || true # '|| true' to prevent failure if file is empty
-          echo "" # Newline for better log readability
+          echo "" 
 
           if [ "$http_response_code" -ge 200 ] && [ "$http_response_code" -lt 300 ]; then
             echo "API smoke test successful (HTTP $http_response_code)."
           else
             echo "API smoke test failed (HTTP $http_response_code)."
             exit 1
+          fi
