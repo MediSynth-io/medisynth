@@ -19,12 +19,9 @@ spec:
       - name: ghcr-login-secret
       containers:
       - name: medisynth-api
-        image: ghcr.io/medisynth-io/medisynth-api:latest
+        image: ghcr.io/medisynth-io/medisynth:latest
         ports:
-        - containerPort: 8080 
-        env: 
-        - name: VIPER_APIPORT
-          value: "8080"
+        - containerPort: 8081 
         resources:
           requests:
             memory: "128Mi"
@@ -35,7 +32,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /heartbeat
-            port: 8080
+            port: 8081
           initialDelaySeconds: 15
           periodSeconds: 20
           timeoutSeconds: 5
@@ -43,7 +40,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /heartbeat
-            port: 8080
+            port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 5
