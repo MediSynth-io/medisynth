@@ -1,0 +1,54 @@
+name: API Smoke Test
+
+on:
+  workflow_dispatch: 
+  
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight UTC
+
+jobs:
+  smoke-test-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for API to be potentially available
+        run: |
+          echo "Optional: Waiting for 30 seconds before testing..."
+          sleep 30
+
+      - name: Run API smoke test (generate 1 patient)
+        env:
+          API_URL: https://api.medisynth.io/generate-patients
+          JSON_PAYLOAD: |
+            {
+              "population": 1,
+              "state": "Washington",
+              "city": "Vancouver",
+              "gender": "M",
+              "ageMin": 20,
+              "ageMax": 40,
+              "seed": 1234432523523523
+            }
+        run: |
+          echo "Sending POST request to $API_URL"
+          # Make the curl command write output to a file and capture HTTP status code
+          http_response_code=$(curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$JSON_PAYLOAD" \
+            --show-error \
+            --silent \
+            --connect-timeout 30 \
+            --max-time 180 \
+            -w "%{http_code}" \
+            "$API_URL" \
+            -o /tmp/api_smoke_test_response.txt)
+
+          echo "API responded with HTTP code: $http_response_code"
+          echo "Response body (first 500 characters):"
+          head -c 500 /tmp/api_smoke_test_response.txt || true # '|| true' to prevent failure if file is empty
+          echo "" # Newline for better log readability
+
+          if [ "$http_response_code" -ge 200 ] && [ "$http_response_code" -lt 300 ]; then
+            echo "API smoke test successful (HTTP $http_response_code)."
+          else
+            echo "API smoke test failed (HTTP $http_response_code)."
+            exit 1
