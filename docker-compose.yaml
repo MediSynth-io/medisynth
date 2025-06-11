@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  medisynth-api:
+    build:
+      context: . 
+      dockerfile: .devops/Dockerfile
+    container_name: medisynth_api_local
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./app.yml:/root/app.yml
+    restart: unless-stopped
