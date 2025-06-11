@@ -1,4 +1,3 @@
-
 APP = medisynth-api
 
 build:
