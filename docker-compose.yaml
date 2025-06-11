@@ -7,7 +7,7 @@ services:
       dockerfile: .devops/Dockerfile
     container_name: medisynth_api_local
     ports:
-      - "8080:8080"
+      - "8081:8081"
     volumes:
       - ./app.yml:/root/app.yml
     restart: unless-stopped
