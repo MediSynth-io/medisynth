@@ -5,6 +5,9 @@ metadata:
   namespace: medisynth-io 
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"    # Timeout for establishing a connection to the backend (seconds)
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"     # Timeout for sending a request to the backend (seconds)
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"     # Timeout for reading a response from the backend (seconds)
 spec:
   ingressClassName: nginx
   tls:
