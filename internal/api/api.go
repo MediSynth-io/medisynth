@@ -36,6 +36,12 @@ func (api *Api) Serve() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
+	// Custom NotFound handler for debugging
+	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("CHI ROUTER - NOT FOUND: Path='%s', RawQuery='%s'", r.URL.Path, r.URL.RawQuery)
+		http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
+	})
+
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello"))
 	})
@@ -43,11 +49,10 @@ func (api *Api) Serve() {
 	// Routes
 	r.Get("/heartbeat", api.Heartbeat)
 	r.Post("/generate-patients", api.RunSyntheaGeneration)
+	r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
 
 	log.Printf("Starting server on port %d...", api.Config.APIPort)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", api.Config.APIPort), r); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
-
-	http.ListenAndServe(fmt.Sprintf(":%d", api.Config.APIPort), r)
 }
