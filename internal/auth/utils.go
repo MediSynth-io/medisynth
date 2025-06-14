@@ -18,15 +18,3 @@ func generateAPIKey() (string, error) {
 	key := base64.URLEncoding.EncodeToString(b)
 	return fmt.Sprintf("ms_%s", key), nil
 }
-
-// validateEmail performs basic email validation
-func validateEmail(email string) bool {
-	// TODO: Implement proper email validation
-	return len(email) > 0 && len(email) < 255
-}
-
-// validatePassword performs basic password validation
-func validatePassword(password string) bool {
-	// TODO: Implement proper password validation
-	return len(password) >= 8
-}
