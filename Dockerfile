@@ -32,7 +32,7 @@ COPY --from=builder /app/medisynth-api .
 COPY --from=builder /app/internal/database/schema.sql ./internal/database/
 
 # Expose the application port
-EXPOSE 8080
+EXPOSE 8081
 
 # Run the application
 CMD ["./medisynth-api"] 

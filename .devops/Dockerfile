@@ -49,10 +49,10 @@ COPY --from=builder --chown=appuser:appgroup /app/templates /app/templates
 USER appuser
 # WORKDIR is already /app, which is where app.yml and medisynth-api are.
 
-EXPOSE 8080
+EXPOSE 8081
 
 # Healthcheck (increased start-period slightly for Java initialization)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -f http://localhost:8080/heartbeat || exit 1
+  CMD curl -f http://localhost:8081/heartbeat || exit 1
 
 CMD ["./medisynth-api"]
