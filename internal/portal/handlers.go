@@ -7,7 +7,6 @@ import (
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/database"
-	"github.com/go-chi/chi/v5"
 )
 
 func (p *Portal) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +113,7 @@ func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(int64)
 	name := r.FormValue("name")
 
-	token, err := auth.CreateToken(userID, name)
+	_, err := auth.CreateToken(userID, name)
 	if err != nil {
 		log.Printf("Error creating token: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -126,9 +125,9 @@ func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 
 func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(int64)
-	tokenID := chi.URLParam(r, "id")
+	tokenID := r.URL.Query().Get("id")
 
-	err := database.DeleteToken(userID, tokenID)
+	err := auth.DeleteToken(userID, tokenID)
 	if err != nil {
 		log.Printf("Error deleting token: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
