@@ -30,7 +30,7 @@ func (p *Portal) Routes() http.Handler {
 	r := chi.NewRouter()
 
 	// Public routes
-	r.Get("/", p.handleHome)
+	r.Get("/", p.HandleHome)
 	r.Get("/login", p.handleLogin)
 	r.Get("/register", p.handleRegister)
 	r.Get("/documentation", p.handleDocumentation)

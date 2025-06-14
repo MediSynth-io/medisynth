@@ -9,7 +9,7 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/database"
 )
 
-func (p *Portal) handleHome(w http.ResponseWriter, r *http.Request) {
+func (p *Portal) HandleHome(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, "base.html", nil)
 }
 

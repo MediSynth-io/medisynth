@@ -59,18 +59,33 @@ func (api *Api) Serve() {
 	// Custom NotFound handler for debugging
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("CHI ROUTER - NOT FOUND: Path='%s', RawQuery='%s'", r.URL.Path, r.URL.RawQuery)
-		// Redirect to portal if the request is not for an API endpoint
-		if !strings.HasPrefix(r.URL.Path, "/auth/") && r.URL.Path != "/heartbeat" {
-			portalURL := fmt.Sprintf("https://portal.medisynth.io%s", r.URL.Path)
-			http.Redirect(w, r, portalURL, http.StatusMovedPermanently)
+
+		// Don't redirect if we're already on the portal domain
+		if r.Host == "portal.medisynth.io" {
+			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
 			return
 		}
-		http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
+
+		// Don't redirect API endpoints
+		if strings.HasPrefix(r.URL.Path, "/auth/") || r.URL.Path == "/heartbeat" {
+			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
+			return
+		}
+
+		// For non-API paths on api.medisynth.io, redirect to portal
+		portalURL := fmt.Sprintf("https://portal.medisynth.io%s", r.URL.Path)
+		http.Redirect(w, r, portalURL, http.StatusMovedPermanently)
 	})
 
 	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "https://portal.medisynth.io", http.StatusMovedPermanently)
+		// Only redirect if we're on the API domain
+		if r.Host == "api.medisynth.io" {
+			http.Redirect(w, r, "https://portal.medisynth.io", http.StatusMovedPermanently)
+			return
+		}
+		// If we're on the portal domain, serve the portal home page
+		api.portal.HandleHome(w, r)
 	})
 	r.Get("/heartbeat", api.Heartbeat)
 
