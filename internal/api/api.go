@@ -77,39 +77,43 @@ func (api *Api) Serve() {
 		http.Redirect(w, r, portalURL, http.StatusMovedPermanently)
 	})
 
-	// Public routes
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		// Only redirect if we're on the API domain
-		if r.Host == "api.medisynth.io" {
-			http.Redirect(w, r, "https://portal.medisynth.io", http.StatusMovedPermanently)
-			return
-		}
-		// If we're on the portal domain, serve the portal home page
-		api.portal.HandleHome(w, r)
-	})
-	r.Get("/heartbeat", api.Heartbeat)
-
-	// Auth routes
-	r.Post("/auth/register", auth.RegisterHandler)
-	r.Post("/auth/login", auth.LoginHandler)
-
-	// Protected routes
+	// Mount routes based on domain
 	r.Group(func(r chi.Router) {
-		r.Use(auth.AuthMiddleware(auth.GetTokenManager()))
-		r.Use(auth.RequireAuth)
+		r.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Host {
+				case "portal.medisynth.io":
+					// Mount portal routes at root for portal domain
+					api.portal.Routes().ServeHTTP(w, r)
+				case "api.medisynth.io":
+					// Mount API routes
+					apiRoutes := chi.NewRouter()
+					apiRoutes.Get("/heartbeat", api.Heartbeat)
+					apiRoutes.Post("/auth/register", auth.RegisterHandler)
+					apiRoutes.Post("/auth/login", auth.LoginHandler)
 
-		// Token management
-		r.Post("/auth/tokens", auth.CreateTokenHandler)
-		r.Get("/auth/tokens", auth.ListTokensHandler)
-		r.Delete("/auth/tokens/{id}", auth.DeleteTokenHandler)
+					// Protected routes
+					apiRoutes.Group(func(r chi.Router) {
+						r.Use(auth.AuthMiddleware(auth.GetTokenManager()))
+						r.Use(auth.RequireAuth)
 
-		// API routes
-		r.Post("/generate-patients", api.RunSyntheaGeneration)
-		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+						// Token management
+						r.Post("/auth/tokens", auth.CreateTokenHandler)
+						r.Get("/auth/tokens", auth.ListTokensHandler)
+						r.Delete("/auth/tokens/{id}", auth.DeleteTokenHandler)
+
+						// API routes
+						r.Post("/generate-patients", api.RunSyntheaGeneration)
+						r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+					})
+
+					apiRoutes.ServeHTTP(w, r)
+				default:
+					next.ServeHTTP(w, r)
+				}
+			})
+		})
 	})
-
-	// Portal routes
-	r.Mount("/portal", api.portal.Routes())
 
 	// Start session cleanup goroutine
 	go func() {
