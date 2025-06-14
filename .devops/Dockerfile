@@ -42,6 +42,9 @@ RUN chown appuser:appgroup /app/app.yml
 # Copy the built Go application and set ownership
 COPY --from=builder --chown=appuser:appgroup /app/medisynth-api /app/medisynth-api
 
+# Copy templates directory
+COPY --from=builder --chown=appuser:appgroup /app/templates /app/templates
+
 # Switch to non-root user
 USER appuser
 # WORKDIR is already /app, which is where app.yml and medisynth-api are.
