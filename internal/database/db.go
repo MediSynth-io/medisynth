@@ -18,13 +18,7 @@ var (
 )
 
 // Init initializes the SQLite database connection
-func Init() error {
-	// Load configuration
-	cfg, err := config.LoadConfig("app.yml")
-	if err != nil {
-		return fmt.Errorf("failed to load config: %v", err)
-	}
-
+func Init(cfg *config.Config) error {
 	// Create data directory if it doesn't exist
 	dataDir := filepath.Dir(cfg.Database.Path)
 	if err := os.MkdirAll(dataDir, 0755); err != nil {

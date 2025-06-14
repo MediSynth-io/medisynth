@@ -28,7 +28,7 @@ func NewApi(config config.Config) (*Api, error) {
 	}
 
 	// Initialize database
-	if err := database.Init(); err != nil {
+	if err := database.Init(&config); err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %v", err)
 	}
 
