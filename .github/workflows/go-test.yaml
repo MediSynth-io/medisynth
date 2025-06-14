@@ -25,9 +25,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
 
-    - name: Install dependencies (if any, e.g., for linters or specific tools)
-:
-      run: go install golang.org/x/lint/golint@latest
+    - name: Install dependencies
       run: echo "No specific dependencies to install for tests beyond go modules."
 
     - name: Vet
@@ -37,15 +35,10 @@ jobs:
       run: |
         go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
-    - name: Upload coverage reports to Codecov (Optional)
-
-      run: echo "Skipping coverage upload for this example."
-
-    - name: Check test summary (Optional, for a quick pass/fail summary)
+    - name: Check test summary
       run: |
         if grep -q "FAIL" coverage.out; then
           echo "Some tests failed."
-          # exit 1 # Optionally fail the workflow here based on coverage.out content
         else
           echo "All tests passed."
         fi
