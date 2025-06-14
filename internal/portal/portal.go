@@ -4,6 +4,7 @@ import (
 	"context"
 	"html/template"
 	"net/http"
+	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/go-chi/chi/v5"
@@ -59,7 +60,20 @@ func requireAuth(next http.Handler) http.Handler {
 			return
 		}
 		session, err := auth.ValidateSession(cookie.Value)
-		if err != nil || session == nil {
+		if err != nil {
+			if err == auth.ErrSessionExpired {
+				// Clear expired session cookie
+				http.SetCookie(w, &http.Cookie{
+					Name:     "session",
+					Value:    "",
+					Path:     "/",
+					Domain:   "portal.medisynth.io",
+					HttpOnly: true,
+					Secure:   true,
+					Expires:  time.Unix(0, 0),
+					SameSite: http.SameSiteStrictMode,
+				})
+			}
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}

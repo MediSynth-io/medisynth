@@ -50,13 +50,14 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
+		Domain:   "portal.medisynth.io",
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	http.Redirect(w, r, "/portal/dashboard", http.StatusSeeOther)
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
@@ -82,13 +83,14 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
+		Domain:   "portal.medisynth.io",
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	http.Redirect(w, r, "/portal/dashboard", http.StatusSeeOther)
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -167,12 +169,13 @@ func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 		Name:     "session",
 		Value:    "",
 		Path:     "/",
+		Domain:   "portal.medisynth.io",
 		HttpOnly: true,
 		Secure:   true,
 		Expires:  time.Unix(0, 0),
 		SameSite: http.SameSiteStrictMode,
 	})
-	http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data interface{}) {

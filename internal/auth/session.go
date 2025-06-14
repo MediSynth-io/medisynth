@@ -48,12 +48,14 @@ func CreateSession(userID int64) (string, error) {
 func ValidateSession(token string) (*database.Session, error) {
 	session, err := database.GetSessionByToken(token)
 	if err != nil {
-		return nil, err
+		return nil, ErrSessionNotFound
 	}
 
 	// Check if session is expired
 	if session.ExpiresAt.Before(time.Now()) {
-		return nil, err
+		// Delete expired session
+		_ = DeleteSession(token)
+		return nil, ErrSessionExpired
 	}
 
 	return session, nil
