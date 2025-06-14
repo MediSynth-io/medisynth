@@ -1,5 +1,8 @@
 FROM golang:1.21-alpine AS builder
 
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev
+
 WORKDIR /app
 
 # Copy go mod and sum files
@@ -11,10 +14,14 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
+# Build the application with CGO enabled
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
 
+# Use a smaller image for the final stage
 FROM alpine:latest
+
+# Install runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
@@ -22,7 +29,7 @@ WORKDIR /app
 COPY --from=builder /app/medisynth-api .
 
 # Copy any additional required files
-COPY --from=builder /app/templates ./templates
+COPY --from=builder /app/internal/database/schema.sql ./internal/database/
 
 # Expose the application port
 EXPOSE 8080
