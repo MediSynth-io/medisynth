@@ -5,6 +5,8 @@ metadata:
   namespace: medisynth-io
   labels:
     app: medisynth-api
+  annotations:
+    timestamp: "2024-03-19-095500"  # This will be updated with each deployment
 spec:
   replicas: 1
   selector:
