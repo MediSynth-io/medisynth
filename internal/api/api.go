@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
@@ -58,12 +59,18 @@ func (api *Api) Serve() {
 	// Custom NotFound handler for debugging
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("CHI ROUTER - NOT FOUND: Path='%s', RawQuery='%s'", r.URL.Path, r.URL.RawQuery)
+		// Redirect to portal if the request is not for an API endpoint
+		if !strings.HasPrefix(r.URL.Path, "/auth/") && r.URL.Path != "/heartbeat" {
+			portalURL := fmt.Sprintf("https://portal.medisynth.io%s", r.URL.Path)
+			http.Redirect(w, r, portalURL, http.StatusMovedPermanently)
+			return
+		}
 		http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
 	})
 
 	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("hello"))
+		http.Redirect(w, r, "https://portal.medisynth.io", http.StatusMovedPermanently)
 	})
 	r.Get("/heartbeat", api.Heartbeat)
 
