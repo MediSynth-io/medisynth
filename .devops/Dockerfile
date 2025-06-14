@@ -1,5 +1,8 @@
 FROM golang:1.24-alpine AS builder
 
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev
+
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -7,12 +10,13 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
+# Build with CGO enabled
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
 
 FROM alpine:latest
 
-# Install OpenJDK 11 (a common choice for Synthea) and curl for healthcheck
-RUN apk add --no-cache openjdk11-jre curl
+# Install runtime dependencies
+RUN apk add --no-cache openjdk11-jre curl ca-certificates tzdata
 
 # Create a directory for the application and Synthea
 RUN mkdir -p /app
