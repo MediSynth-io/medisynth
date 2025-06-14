@@ -7,6 +7,7 @@ import (
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/go-chi/chi/v5"
 )
 
 func (p *Portal) HandleHome(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +141,11 @@ func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 
 func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(int64)
-	tokenID := r.URL.Query().Get("id")
+	tokenID := chi.URLParam(r, "id")
+	if tokenID == "" {
+		http.Error(w, "Token ID required", http.StatusBadRequest)
+		return
+	}
 
 	err := auth.DeleteToken(userID, tokenID)
 	if err != nil {

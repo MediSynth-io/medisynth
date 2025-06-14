@@ -95,12 +95,13 @@ func (api *Api) Serve() {
 
 	// Protected routes
 	r.Group(func(r chi.Router) {
+		r.Use(auth.AuthMiddleware(auth.GetTokenManager()))
 		r.Use(auth.RequireAuth)
 
 		// Token management
 		r.Post("/auth/tokens", auth.CreateTokenHandler)
 		r.Get("/auth/tokens", auth.ListTokensHandler)
-		r.Delete("/auth/tokens", auth.DeleteTokenHandler)
+		r.Delete("/auth/tokens/{id}", auth.DeleteTokenHandler)
 
 		// API routes
 		r.Post("/generate-patients", api.RunSyntheaGeneration)

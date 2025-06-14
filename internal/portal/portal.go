@@ -45,7 +45,7 @@ func (p *Portal) Routes() http.Handler {
 		r.Use(requireAuth)
 		r.Get("/dashboard", p.handleDashboard)
 		r.Get("/tokens", p.handleTokens)
-		r.Post("/tokens", p.handleCreateToken)
+		r.Post("/tokens/create", p.handleCreateToken)
 		r.Delete("/tokens/{id}", p.handleDeleteToken)
 	})
 
