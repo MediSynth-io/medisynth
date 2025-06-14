@@ -6,10 +6,8 @@ RUN apt-get update && apt-get install -y gcc
 
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
-
 # Download all dependencies
+COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the source code
@@ -22,15 +20,12 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./c
 FROM alpine:latest
 
 # Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/medisynth-api .
-
-# Copy any additional required files
-COPY --from=builder /app/internal/database/schema.sql ./internal/database/
 
 # Expose the application port
 EXPOSE 8081
