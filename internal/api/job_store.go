@@ -70,7 +70,9 @@ func (s *JobStore) GetJob(id string) (*GenerationJob, bool) {
 func (s *JobStore) UpdateJob(job *GenerationJob) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.jobs[job.ID] = job
+	if _, exists := s.jobs[job.ID]; exists {
+		s.jobs[job.ID] = job
+	}
 }
 
 // DeleteJob removes a job from the store

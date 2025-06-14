@@ -1,1 +1,3 @@
 apiPort: 8081
+database:
+  path: data/medisynth.db

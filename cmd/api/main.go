@@ -9,13 +9,24 @@ import (
 
 const version = "0.0.1"
 
-func main() {
-	cfg, err := config.Init()
+var configInit = config.Init
+
+func initializeAPI() (*api.Api, error) {
+	cfg, err := configInit()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	api, err := api.NewApi(*cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return api, nil
+}
+
+func main() {
+	api, err := initializeAPI()
 	if err != nil {
 		log.Fatal(err)
 	}

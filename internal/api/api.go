@@ -9,13 +9,17 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/portal"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 type Api struct {
 	Config config.Config
+	portal *portal.Portal
 }
 
 func NewApi(config config.Config) (*Api, error) {
@@ -23,8 +27,20 @@ func NewApi(config config.Config) (*Api, error) {
 		return nil, errors.New("Must have at least a port to start API")
 	}
 
+	// Initialize database
+	if err := database.Init(); err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %v", err)
+	}
+
+	// Initialize portal
+	p, err := portal.New()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize portal: %v", err)
+	}
+
 	api := Api{
 		Config: config,
+		portal: p,
 	}
 
 	return &api, nil
@@ -45,19 +61,35 @@ func (api *Api) Serve() {
 		http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
 	})
 
+	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("hello"))
 	})
-
-	// Routes
 	r.Get("/heartbeat", api.Heartbeat)
-	r.Post("/generate-patients", api.RunSyntheaGeneration)
-	r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+
+	// Auth routes
+	r.Post("/auth/register", auth.RegisterHandler)
+	r.Post("/auth/login", auth.LoginHandler)
+
+	// Protected routes
+	r.Group(func(r chi.Router) {
+		r.Use(auth.RequireAuth)
+
+		// Token management
+		r.Post("/auth/tokens", auth.CreateTokenHandler)
+		r.Get("/auth/tokens", auth.ListTokensHandler)
+		r.Delete("/auth/tokens", auth.DeleteTokenHandler)
+
+		// API routes
+		r.Post("/generate-patients", api.RunSyntheaGeneration)
+		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+	})
+
+	// Portal routes
+	r.Mount("/portal", api.portal.Routes())
 
 	log.Printf("Starting server on port %d...", api.Config.APIPort)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", api.Config.APIPort), r); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
-	}
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", api.Config.APIPort), r))
 }
 
 func (api *Api) Heartbeat(w http.ResponseWriter, r *http.Request) {

@@ -4,11 +4,11 @@ import (
 	"github.com/spf13/viper"
 )
 
-func Init() (*Config, error) { // Changed return type
-	viper.SetDefault("config_dir", ".") // Assuming app.yml is in the execution directory
+func Init() (*Config, error) {
+	viper.SetDefault("CONFIG_DIR", ".") // Assuming app.yml is in the execution directory
 	viper.AutomaticEnv()
 
-	viper.AddConfigPath(viper.GetString("config_dir"))
+	viper.AddConfigPath(viper.GetString("CONFIG_DIR"))
 	viper.SetConfigName("app") // Name of config file (without extension)
 	viper.SetConfigType("yml") // Type of config file (yaml for app.yml)
 
@@ -16,14 +16,14 @@ func Init() (*Config, error) { // Changed return type
 		// It's better to return the error and let the caller decide if it's fatal
 		// or if defaults should be used.
 		// For now, we'll return the error.
-		return nil, err // Changed return
+		return nil, err
 	}
 
-	var c Config // Use AppConfig here
+	var c Config
 
 	err := viper.Unmarshal(&c)
 	if err != nil {
-		return nil, err // Changed return
+		return nil, err
 	}
 
 	// Set default port if not specified, similar to LoadConfig
