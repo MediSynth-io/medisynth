@@ -12,7 +12,7 @@ import (
 )
 
 func (p *Portal) HandleHome(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, r, "base.html", nil)
+	p.renderTemplate(w, r, "home.html", nil)
 }
 
 func (p *Portal) handleLogin(w http.ResponseWriter, r *http.Request) {
