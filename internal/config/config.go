@@ -14,14 +14,19 @@ type Config struct {
 // LoadConfig loads the configuration from file and environment variables.
 func LoadConfig(path string) (*Config, error) {
 	v := viper.New()
-	v.AddConfigPath(path)  // Path to look for the config file in
-	v.SetConfigName("app") // Name of config file (without extension)
-	v.SetConfigType("yml") // REQUIRED if the config file does not have the extension in the name
-	v.AutomaticEnv()       // Read in environment variables that match
+
+	// Set up config file handling
+	v.SetConfigFile(path)   // Use the full path to the config file
+	v.SetConfigType("toml") // Set the config type to toml
+	v.AutomaticEnv()        // Read in environment variables that match
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// If a config file is found, read it in.
+	// Try to read the config file
 	if err := v.ReadInConfig(); err != nil {
+		// If the file doesn't exist or is invalid, return an error
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, err
+		}
 		log.Printf("Warning: Could not read config file: %s. Using defaults or environment variables.", err)
 	}
 
@@ -32,8 +37,8 @@ func LoadConfig(path string) (*Config, error) {
 
 	// Set default port if not specified
 	if cfg.APIPort == 0 {
-		cfg.APIPort = 8080 // Default port
-		log.Println("APIPort not specified, using default 8080")
+		cfg.APIPort = 8081 // Default port
+		log.Println("APIPort not specified, using default 8081")
 	}
 
 	log.Printf("Configuration loaded: %+v", cfg)

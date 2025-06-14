@@ -1,0 +1,4 @@
+  - name: Run tests
+    run: go test -v ./...
+    env:
+      APIPORT: 8081 
