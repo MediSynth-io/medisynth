@@ -1,6 +1,7 @@
 package portal
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -11,19 +12,19 @@ import (
 )
 
 func (p *Portal) HandleHome(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, "base.html", nil)
+	p.renderTemplate(w, r, "base.html", nil)
 }
 
 func (p *Portal) handleLogin(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, "login.html", nil)
+	p.renderTemplate(w, r, "login.html", nil)
 }
 
 func (p *Portal) handleRegister(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, "register.html", nil)
+	p.renderTemplate(w, r, "register.html", nil)
 }
 
 func (p *Portal) handleDocumentation(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, "documentation.html", nil)
+	p.renderTemplate(w, r, "documentation.html", nil)
 }
 
 func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +100,7 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.renderTemplate(w, "dashboard.html", user)
+	p.renderTemplate(w, r, "dashboard.html", user)
 }
 
 func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +122,7 @@ func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
 		NewToken: tokenValue,
 	}
 
-	p.renderTemplate(w, "tokens.html", data)
+	p.renderTemplate(w, r, "tokens.html", data)
 }
 
 func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
@@ -172,4 +173,35 @@ func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 	})
 	http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+}
+
+func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmpl string, data interface{}) {
+	// Create a map to hold template data
+	templateData := map[string]interface{}{
+		"Data": data,
+	}
+
+	// Add user context if available
+	if userID, ok := r.Context().Value("userID").(int64); ok {
+		user, err := database.GetUserByID(userID)
+		if err == nil {
+			templateData["User"] = user
+		}
+	}
+
+	err := p.templates.ExecuteTemplate(w, tmpl, templateData)
+	if err != nil {
+		log.Printf("Error rendering template %s: %v", tmpl, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// responseWriter is a wrapper around http.ResponseWriter that includes the request context
+type responseWriter struct {
+	http.ResponseWriter
+	req *http.Request
+}
+
+func (rw *responseWriter) Context() context.Context {
+	return rw.req.Context()
 }

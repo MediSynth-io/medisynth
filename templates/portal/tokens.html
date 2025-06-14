@@ -1,6 +1,7 @@
 {{define "title"}}API Tokens - MediSynth Portal{{end}}
 
 {{define "content"}}
+{{if .User}}
 <div class="bg-white shadow overflow-hidden sm:rounded-lg">
     <div class="px-4 py-5 sm:px-6">
         <h3 class="text-lg leading-6 font-medium text-gray-900">
@@ -12,7 +13,7 @@
     </div>
     <div class="border-t border-gray-200">
         <div class="px-4 py-5 sm:p-6">
-            <form action="/portal/tokens/create" method="POST" class="space-y-4">
+            <form action="/tokens/create" method="POST" class="space-y-4">
                 <div>
                     <label for="name" class="block text-sm font-medium text-gray-700">
                         Token Name
@@ -36,6 +37,12 @@
   <strong class="font-bold">New Token:</strong>
   <span class="block sm:inline">{{.NewToken}}</span>
   <span class="block text-xs text-gray-500">Copy this token now. You won't be able to see it again!</span>
+</div>
+{{end}}
+{{else}}
+<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+  <strong class="font-bold">Authentication Required</strong>
+  <p class="block sm:inline">Please <a href="/login" class="underline">login</a> to manage your API tokens.</p>
 </div>
 {{end}}
 
