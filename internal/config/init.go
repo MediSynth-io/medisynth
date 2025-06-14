@@ -28,7 +28,7 @@ func Init() (*Config, error) {
 
 	// Set default port if not specified, similar to LoadConfig
 	if c.APIPort == 0 {
-		c.APIPort = 8080 // Default port
+		c.APIPort = 8081 // Default port
 	}
 
 	return &c, nil
