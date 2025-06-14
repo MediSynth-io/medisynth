@@ -1,10 +1,12 @@
 package portal
 
 import (
+	"context"
 	"html/template"
 	"log"
 	"net/http"
 
+	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -34,6 +36,9 @@ func (p *Portal) Routes() http.Handler {
 	r.Post("/login", p.handleLoginPost)
 	r.Post("/register", p.handleRegisterPost)
 
+	// Logout route
+	r.Get("/logout", p.handleLogout)
+
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(requireAuth)
@@ -56,7 +61,18 @@ func (p *Portal) renderTemplate(w http.ResponseWriter, tmpl string, data interfa
 
 func requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO: Implement session validation
-		next.ServeHTTP(w, r)
+		cookie, err := r.Cookie("session")
+		if err != nil || cookie.Value == "" {
+			http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+			return
+		}
+		session, err := auth.ValidateSession(cookie.Value)
+		if err != nil || session == nil {
+			http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+			return
+		}
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, "userID", session.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

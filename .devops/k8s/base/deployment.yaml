@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: medisynth-api-deployment
+  name: medisynth-api
   namespace: medisynth-io
   labels:
     app: medisynth-api
@@ -23,6 +23,7 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 8081
+          name: http
         resources:
           requests:
             memory: "256Mi"
@@ -33,42 +34,29 @@ spec:
         livenessProbe:
           httpGet:
             path: /heartbeat
-            port: 8081
-          initialDelaySeconds: 15
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /heartbeat
-            port: 8081
+            port: http
           initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+          periodSeconds: 5
         volumeMounts:
-        - name: config-volume
-          mountPath: /app/config
         - name: sqlite-data
           mountPath: /data
-          readOnly: true
+        - name: config
+          mountPath: /app/config
         env:
         - name: CONFIG_DIR
-          value: "/app/config"
-        - name: SQLITE_SOCKET_PATH
-          value: "/data/sqlite.sock"
+          value: /app/config
       - name: sqlite
-        image: keinos/sqlite3:latest
-        command: ["/bin/sh", "-c"]
-        args:
-        - |
-          while true; do
-            sqlite3 /data/medisynth.db "PRAGMA journal_mode=WAL;"
-            sleep 30
-          done
-        volumeMounts:
-        - name: sqlite-data
-          mountPath: /data
+        image: nouchka/sqlite3:latest
+        command: ["sh", "-c", "while true; do sleep 3600; done"]
+        ports:
+        - containerPort: 8082
+          name: http
         resources:
           requests:
             memory: "128Mi"
@@ -76,10 +64,28 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        volumeMounts:
+        - name: sqlite-data
+          mountPath: /data
+          subPath: sqlite
+        env:
+        - name: SQLITE_DATABASE
+          value: medisynth.db
+        - name: SQLITE_SOCKET_PATH
+          value: /data/sqlite.sock
+        - name: SQLITE_WAL_MODE
+          value: "true"
+      initContainers:
+      - name: init-chown-data
+        image: busybox
+        command: ["chown", "-R", "1000:1000", "/data"]
+        volumeMounts:
+        - name: sqlite-data
+          mountPath: /data
       volumes:
-      - name: config-volume
-        configMap:
-          name: medisynth-config
       - name: sqlite-data
         persistentVolumeClaim:
           claimName: medisynth-sqlite-pvc
+      - name: config
+        configMap:
+          name: medisynth-config

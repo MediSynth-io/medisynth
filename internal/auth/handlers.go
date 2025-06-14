@@ -5,7 +5,39 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
+
+var (
+	userStore    *SQLiteUserStore
+	tokenManager *TokenManager
+	apiKeyStore  *SQLiteAPIKeyStore
+)
+
+// GetUserStore returns the global user store instance
+func GetUserStore() *SQLiteUserStore {
+	if userStore == nil {
+		userStore = NewUserStore()
+	}
+	return userStore
+}
+
+// GetTokenManager returns the global token manager instance
+func GetTokenManager() *TokenManager {
+	if tokenManager == nil {
+		tokenManager = NewTokenManager("your-secret-key") // TODO: Get from config
+	}
+	return tokenManager
+}
+
+// GetAPIKeyStore returns the global API key store instance
+func GetAPIKeyStore() *SQLiteAPIKeyStore {
+	if apiKeyStore == nil {
+		apiKeyStore = NewAPIKeyStore()
+	}
+	return apiKeyStore
+}
 
 type LoginRequest struct {
 	Email    string `json:"email"`
@@ -18,7 +50,8 @@ type RegisterRequest struct {
 }
 
 type TokenRequest struct {
-	Name string `json:"name"`
+	Name      string    `json:"name"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type TokenResponse struct {
@@ -37,36 +70,38 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := RegisterUser(req.Email, req.Password)
-	if err != nil {
-		log.Printf("Registration failed: %v", err)
-		http.Error(w, "Registration failed", http.StatusBadRequest)
+	if !validateEmail(req.Email) {
+		http.Error(w, "Invalid email", http.StatusBadRequest)
 		return
 	}
 
-	// Create session
-	token, err := CreateSession(user.ID)
-	if err != nil {
-		log.Printf("Error creating session: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	if !validatePassword(req.Password) {
+		http.Error(w, "Invalid password", http.StatusBadRequest)
 		return
 	}
 
-	// Set session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(24 * time.Hour),
-	})
+	user, err := NewUser(req.Email, req.Password)
+	if err != nil {
+		log.Printf("Failed to create user: %v", err)
+		http.Error(w, "Registration failed", http.StatusInternalServerError)
+		return
+	}
+
+	userStore := GetUserStore()
+	if err := userStore.Create(user); err != nil {
+		log.Printf("Failed to store user: %v", err)
+		http.Error(w, "Registration failed", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":    user.ID,
+		"email": user.Email,
+	})
 }
 
-// LoginHandler handles user login and returns an API token
+// LoginHandler handles user login
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -74,37 +109,38 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := ValidateUser(req.Email, req.Password)
+	userStore := GetUserStore()
+	user, err := userStore.GetByEmail(req.Email)
 	if err != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	// Create session
-	token, err := CreateSession(user.ID)
-	if err != nil {
-		log.Printf("Error creating session: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	if !user.ValidatePassword(req.Password) {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	// Set session cookie
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  time.Now().Add(24 * time.Hour),
-	})
+	tokenManager := GetTokenManager()
+	token, err := tokenManager.GenerateToken(user, 24*time.Hour)
+	if err != nil {
+		log.Printf("Failed to generate token: %v", err)
+		http.Error(w, "Login failed", http.StatusInternalServerError)
+		return
+	}
 
-	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"token": token,
+	})
 }
 
 // CreateTokenHandler creates a new API token for the authenticated user
 func CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
+	claims, ok := GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	var req TokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -112,46 +148,83 @@ func CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := CreateToken(userID, req.Name)
+	key, err := generateAPIKey()
 	if err != nil {
-		log.Printf("Error creating token: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("Failed to generate API key: %v", err)
+		http.Error(w, "Failed to create API key", http.StatusInternalServerError)
 		return
 	}
 
-	json.NewEncoder(w).Encode(TokenResponse{Token: token.Token})
+	apiKey := &APIKey{
+		UserID:    claims.UserID,
+		Key:       key,
+		Name:      req.Name,
+		CreatedAt: time.Now(),
+		ExpiresAt: req.ExpiresAt,
+	}
+
+	apiKeyStore := GetAPIKeyStore()
+	if err := apiKeyStore.Create(apiKey); err != nil {
+		log.Printf("Failed to store API key: %v", err)
+		http.Error(w, "Failed to create API key", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(apiKey)
 }
 
 // ListTokensHandler returns all API tokens for the authenticated user
 func ListTokensHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
-
-	tokens, err := ListTokens(userID)
-	if err != nil {
-		log.Printf("Error listing tokens: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	claims, ok := GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	json.NewEncoder(w).Encode(tokens)
+	apiKeyStore := GetAPIKeyStore()
+	keys, err := apiKeyStore.GetByUserID(claims.UserID)
+	if err != nil {
+		log.Printf("Failed to list API keys: %v", err)
+		http.Error(w, "Failed to list API keys", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(keys)
 }
 
 // DeleteTokenHandler removes an API token
 func DeleteTokenHandler(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
-	tokenID := r.URL.Query().Get("id")
-
-	if tokenID == "" {
-		http.Error(w, "Token ID required", http.StatusBadRequest)
+	claims, ok := GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	err := DeleteToken(userID, tokenID)
-	if err != nil {
-		log.Printf("Error deleting token: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	keyID := chi.URLParam(r, "id")
+	if keyID == "" {
+		http.Error(w, "API key ID required", http.StatusBadRequest)
+		return
+	}
+
+	apiKeyStore := GetAPIKeyStore()
+	if err := apiKeyStore.Delete(claims.UserID); err != nil {
+		log.Printf("Failed to delete API key: %v", err)
+		http.Error(w, "Failed to delete API key", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// validateEmail checks if an email is valid
+func validateEmail(email string) bool {
+	// TODO: Implement proper email validation
+	return len(email) > 0 && len(email) < 255
+}
+
+// validatePassword checks if a password is valid
+func validatePassword(password string) bool {
+	// TODO: Implement proper password validation
+	return len(password) >= 8
 }

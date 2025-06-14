@@ -88,6 +88,19 @@ func (api *Api) Serve() {
 	// Portal routes
 	r.Mount("/portal", api.portal.Routes())
 
+	// Start session cleanup goroutine
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			err := auth.CleanupExpiredSessions()
+			if err != nil {
+				log.Printf("Error cleaning up expired sessions: %v", err)
+			}
+			<-ticker.C
+		}
+	}()
+
 	log.Printf("Starting server on port %d...", api.Config.APIPort)
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", api.Config.APIPort), r))
 }

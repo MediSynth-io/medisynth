@@ -5,10 +5,11 @@ metadata:
   namespace: medisynth-io
 data:
   app.yml: |
-    apiPort: 8081
+    api:
+      port: 8081
     database:
       path: /data/medisynth.db
-      socketPath: /data/sqlite.sock
+      socketPath: /data/sqlite/sqlite.sock
       walMode: true
       maxRetries: 5
       retryDelay: 5 

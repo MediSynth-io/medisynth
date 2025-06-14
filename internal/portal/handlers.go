@@ -106,21 +106,32 @@ func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	p.renderTemplate(w, "tokens.html", tokens)
+	// Check for a token value in the query params (for display after creation)
+	tokenValue := r.URL.Query().Get("new_token")
+	data := struct {
+		Tokens   []*database.Token
+		NewToken string
+	}{
+		Tokens:   tokens,
+		NewToken: tokenValue,
+	}
+
+	p.renderTemplate(w, "tokens.html", data)
 }
 
 func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(int64)
 	name := r.FormValue("name")
 
-	_, err := auth.CreateToken(userID, name)
+	token, err := auth.CreateToken(userID, name)
 	if err != nil {
 		log.Printf("Error creating token: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	http.Redirect(w, r, "/portal/tokens", http.StatusSeeOther)
+	// Redirect to tokens page with the new token value in the query string
+	http.Redirect(w, r, "/portal/tokens?new_token="+token.Token, http.StatusSeeOther)
 }
 
 func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
@@ -135,4 +146,21 @@ func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/portal/tokens", http.StatusSeeOther)
+}
+
+func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("session")
+	if err == nil && cookie.Value != "" {
+		_ = auth.DeleteSession(cookie.Value)
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		Expires:  time.Unix(0, 0),
+		SameSite: http.SameSiteStrictMode,
+	})
+	http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
 }
