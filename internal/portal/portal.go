@@ -55,12 +55,12 @@ func requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session")
 		if err != nil || cookie.Value == "" {
-			http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		session, err := auth.ValidateSession(cookie.Value)
 		if err != nil || session == nil {
-			http.Redirect(w, r, "/portal/login", http.StatusSeeOther)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 		ctx := r.Context()
