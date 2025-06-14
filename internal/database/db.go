@@ -33,6 +33,7 @@ func Init(cfg *config.Config) error {
 		if cfg.Database.WALMode {
 			dsn += "?_journal=WAL"
 		}
+		var err error
 		db, err = sql.Open("sqlite3", dsn)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to open database: %v", err)
