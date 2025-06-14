@@ -10,23 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type User struct {
-	ID        int64
-	Email     string
-	Password  string
-	CreatedAt time.Time
-}
-
-type Token struct {
-	ID        int64
-	UserID    int64
-	Name      string
-	Token     string
-	CreatedAt time.Time
-	ExpiresAt *time.Time
-}
-
-func RegisterUser(email, password string) (*User, error) {
+func RegisterUser(email, password string) (*database.User, error) {
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -42,7 +26,7 @@ func RegisterUser(email, password string) (*User, error) {
 	return user, nil
 }
 
-func ValidateUser(email, password string) (*User, error) {
+func ValidateUser(email, password string) (*database.User, error) {
 	user, err := database.GetUserByEmail(email)
 	if err != nil {
 		return nil, err
@@ -57,7 +41,7 @@ func ValidateUser(email, password string) (*User, error) {
 	return user, nil
 }
 
-func CreateToken(userID int64, name string) (*Token, error) {
+func CreateToken(userID int64, name string) (*database.Token, error) {
 	// Generate random token
 	tokenBytes := make([]byte, 32)
 	_, err := rand.Read(tokenBytes)
@@ -78,7 +62,7 @@ func CreateToken(userID int64, name string) (*Token, error) {
 	return tokenObj, nil
 }
 
-func ValidateToken(token string) (*Token, error) {
+func ValidateToken(token string) (*database.Token, error) {
 	tokenObj, err := database.GetTokenByValue(token)
 	if err != nil {
 		return nil, err
@@ -96,6 +80,6 @@ func DeleteToken(userID int64, tokenID string) error {
 	return database.DeleteToken(userID, tokenID)
 }
 
-func ListTokens(userID int64) ([]*Token, error) {
+func ListTokens(userID int64) ([]*database.Token, error) {
 	return database.GetUserTokens(userID)
 }

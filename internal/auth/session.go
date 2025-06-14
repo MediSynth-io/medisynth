@@ -2,8 +2,7 @@ package auth
 
 import (
 	"crypto/rand"
-	"database/sql"
-	"encoding/hex"
+	"encoding/base64"
 	"errors"
 	"time"
 
@@ -24,84 +23,48 @@ type Session struct {
 }
 
 // CreateSession creates a new session for a user
-func CreateSession(userID int64) (*Session, error) {
+func CreateSession(userID int64) (string, error) {
 	// Generate random token
 	tokenBytes := make([]byte, 32)
-	if _, err := rand.Read(tokenBytes); err != nil {
-		return nil, err
+	_, err := rand.Read(tokenBytes)
+	if err != nil {
+		return "", err
 	}
-	token := hex.EncodeToString(tokenBytes)
+	token := base64.URLEncoding.EncodeToString(tokenBytes)
 
-	// Set expiration to 24 hours
+	// Set expiration to 24 hours from now
 	expiresAt := time.Now().Add(24 * time.Hour)
 
-	// Insert session into database
-	result, err := database.GetDB().Exec(
-		"INSERT INTO sessions (user_id, token, expires_at) VALUES (?, ?, ?)",
-		userID, token, expiresAt,
-	)
+	// Create session in database
+	err = database.CreateSession(userID, token, expiresAt)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	// Get the new session's ID
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-
-	return &Session{
-		ID:        id,
-		UserID:    userID,
-		Token:     token,
-		CreatedAt: time.Now(),
-		ExpiresAt: expiresAt,
-	}, nil
+	return token, nil
 }
 
 // ValidateSession checks if a session is valid and returns the associated user ID
-func ValidateSession(token string) (int64, error) {
-	var userID int64
-	var expiresAt time.Time
-	err := database.GetDB().QueryRow(
-		"SELECT user_id, expires_at FROM sessions WHERE token = ?",
-		token,
-	).Scan(&userID, &expiresAt)
-	if err == sql.ErrNoRows {
-		return 0, ErrSessionNotFound
-	}
+func ValidateSession(token string) (*database.Session, error) {
+	session, err := database.GetSessionByToken(token)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
-	// Check if session has expired
-	if expiresAt.Before(time.Now()) {
-		return 0, ErrSessionExpired
+	// Check if session is expired
+	if session.ExpiresAt.Before(time.Now()) {
+		return nil, err
 	}
 
-	return userID, nil
+	return session, nil
 }
 
 // DeleteSession removes a session
 func DeleteSession(token string) error {
-	result, err := database.GetDB().Exec("DELETE FROM sessions WHERE token = ?", token)
-	if err != nil {
-		return err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return ErrSessionNotFound
-	}
-
-	return nil
+	return database.DeleteSession(token)
 }
 
 // CleanupExpiredSessions removes all expired sessions
 func CleanupExpiredSessions() error {
-	_, err := database.GetDB().Exec("DELETE FROM sessions WHERE expires_at < ?", time.Now())
-	return err
+	return database.CleanupExpiredSessions()
 }

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: medisynth-config
+  namespace: medisynth-io
+data:
+  app.yml: |
+    apiPort: 8081
+    database:
+      path: /data/medisynth.db
+      socketPath: /data/sqlite.sock
+      walMode: true
+      maxRetries: 5
+      retryDelay: 5 

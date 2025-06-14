@@ -20,15 +20,16 @@ spec:
       containers:
       - name: medisynth-api
         image: ghcr.io/medisynth-io/medisynth:latest
+        imagePullPolicy: Always
         ports:
-        - containerPort: 8081 
+        - containerPort: 8081
         resources:
           requests:
-            memory: "500Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "5000Mi"
-            cpu: "3000m"
+            memory: "512Mi"
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /heartbeat
@@ -45,3 +46,40 @@ spec:
           periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+        - name: sqlite-data
+          mountPath: /data
+          readOnly: true
+        env:
+        - name: CONFIG_DIR
+          value: "/app/config"
+        - name: SQLITE_SOCKET_PATH
+          value: "/data/sqlite.sock"
+      - name: sqlite
+        image: keinos/sqlite3:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          while true; do
+            sqlite3 /data/medisynth.db "PRAGMA journal_mode=WAL;"
+            sleep 30
+          done
+        volumeMounts:
+        - name: sqlite-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: config-volume
+        configMap:
+          name: medisynth-config
+      - name: sqlite-data
+        persistentVolumeClaim:
+          claimName: medisynth-sqlite-pvc

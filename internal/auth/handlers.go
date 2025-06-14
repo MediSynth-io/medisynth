@@ -2,169 +2,154 @@ package auth
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 )
 
-type registerRequest struct {
+type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-type loginRequest struct {
+type RegisterRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-type tokenRequest struct {
-	Name      string `json:"name"`
-	ExpiresIn int64  `json:"expiresIn"` // Duration in seconds
+type TokenRequest struct {
+	Name string `json:"name"`
 }
 
-type errorResponse struct {
+type TokenResponse struct {
+	Token string `json:"token"`
+}
+
+type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
 // RegisterHandler handles user registration
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
-	var req registerRequest
+	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	user, err := Register(req.Email, req.Password)
+	user, err := RegisterUser(req.Email, req.Password)
 	if err != nil {
-		if err == ErrEmailAlreadyTaken {
-			http.Error(w, "Email already taken", http.StatusConflict)
-			return
-		}
-		http.Error(w, "Failed to register user", http.StatusInternalServerError)
+		log.Printf("Registration failed: %v", err)
+		http.Error(w, "Registration failed", http.StatusBadRequest)
 		return
 	}
+
+	// Create session
+	token, err := CreateSession(user.ID)
+	if err != nil {
+		log.Printf("Error creating session: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Set session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(24 * time.Hour),
+	})
 
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"id":    user.ID,
-		"email": user.Email,
-	})
 }
 
 // LoginHandler handles user login and returns an API token
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-	var req loginRequest
+	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	user, err := Authenticate(req.Email, req.Password)
+	user, err := ValidateUser(req.Email, req.Password)
 	if err != nil {
-		if err == ErrUserNotFound || err == ErrInvalidPassword {
-			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
-			return
-		}
-		http.Error(w, "Authentication failed", http.StatusInternalServerError)
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	// Generate a token that expires in 30 days
-	token, err := GenerateToken(user.ID, "Login token", 30*24*time.Hour)
+	// Create session
+	token, err := CreateSession(user.ID)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		log.Printf("Error creating session: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
+	// Set session cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Now().Add(24 * time.Hour),
+	})
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"token": token.Token,
-		"user": map[string]interface{}{
-			"id":    user.ID,
-			"email": user.Email,
-		},
-	})
 }
 
 // CreateTokenHandler creates a new API token for the authenticated user
 func CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserID(r)
-	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	userID := r.Context().Value("userID").(int64)
 
-	var req tokenRequest
+	var req TokenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	var expiresIn time.Duration
-	if req.ExpiresIn > 0 {
-		expiresIn = time.Duration(req.ExpiresIn) * time.Second
-	}
-
-	token, err := GenerateToken(userID, req.Name, expiresIn)
+	token, err := CreateToken(userID, req.Name)
 	if err != nil {
-		http.Error(w, "Failed to generate token", http.StatusInternalServerError)
+		log.Printf("Error creating token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"token":     token.Token,
-		"name":      token.Name,
-		"expiresAt": token.ExpiresAt,
-	})
+	json.NewEncoder(w).Encode(TokenResponse{Token: token.Token})
 }
 
 // ListTokensHandler returns all API tokens for the authenticated user
 func ListTokensHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserID(r)
-	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
-		return
-	}
+	userID := r.Context().Value("userID").(int64)
 
-	tokens, err := ListUserTokens(userID)
+	tokens, err := ListTokens(userID)
 	if err != nil {
-		http.Error(w, "Failed to list tokens", http.StatusInternalServerError)
+		log.Printf("Error listing tokens: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"tokens": tokens,
-	})
+	json.NewEncoder(w).Encode(tokens)
 }
 
 // DeleteTokenHandler removes an API token
 func DeleteTokenHandler(w http.ResponseWriter, r *http.Request) {
-	userID, ok := GetUserID(r)
-	if !ok {
-		http.Error(w, "Authentication required", http.StatusUnauthorized)
+	userID := r.Context().Value("userID").(int64)
+	tokenID := r.URL.Query().Get("id")
+
+	if tokenID == "" {
+		http.Error(w, "Token ID required", http.StatusBadRequest)
 		return
 	}
 
-	token := r.URL.Query().Get("token")
-	if token == "" {
-		http.Error(w, "Token parameter required", http.StatusBadRequest)
-		return
-	}
-
-	// Verify the token belongs to the user
-	userIDFromToken, err := ValidateToken(token)
+	err := DeleteToken(userID, tokenID)
 	if err != nil {
-		http.Error(w, "Invalid token", http.StatusBadRequest)
-		return
-	}
-	if userIDFromToken != userID {
-		http.Error(w, "Unauthorized", http.StatusForbidden)
-		return
-	}
-
-	if err := DeleteToken(token); err != nil {
-		http.Error(w, "Failed to delete token", http.StatusInternalServerError)
+		log.Printf("Error deleting token: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
