@@ -33,6 +33,7 @@ func (p *Portal) Routes() http.Handler {
 	r.Get("/", p.handleHome)
 	r.Get("/login", p.handleLogin)
 	r.Get("/register", p.handleRegister)
+	r.Get("/documentation", p.handleDocumentation)
 	r.Post("/login", p.handleLoginPost)
 	r.Post("/register", p.handleRegisterPost)
 

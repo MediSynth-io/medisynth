@@ -3,7 +3,7 @@ version: '3.8'
 services:
   api:
     build:
-      context: .
+      context: . 
       dockerfile: .devops/docker/api/Dockerfile
     ports:
       - "8081:8081"

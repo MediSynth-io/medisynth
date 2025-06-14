@@ -9,7 +9,6 @@ data:
       port: 8081
     database:
       path: /data/medisynth.db
-      socketPath: /data/sqlite/sqlite.sock
       walMode: true
       maxRetries: 5
       retryDelay: 5 

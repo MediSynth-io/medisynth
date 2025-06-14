@@ -21,6 +21,10 @@ func (p *Portal) handleRegister(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, "register.html", nil)
 }
 
+func (p *Portal) handleDocumentation(w http.ResponseWriter, r *http.Request) {
+	p.renderTemplate(w, "documentation.html", nil)
+}
+
 func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
