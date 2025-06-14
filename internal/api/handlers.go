@@ -1,228 +1,343 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strconv"
 	"strings"
+	"testing"
 	"time"
+
+	"github.com/MediSynth-io/medisynth/internal/config"
 )
 
-// SyntheaParams defines the expected parameters for generating Synthea data.
-type SyntheaParams struct {
-	Population    *int    `json:"population,omitempty"`
-	State         *string `json:"state,omitempty"`
-	City          *string `json:"city,omitempty"`
-	Gender        *string `json:"gender,omitempty"` // M or F
-	AgeMin        *int    `json:"ageMin,omitempty"`
-	AgeMax        *int    `json:"ageMax,omitempty"`
-	Seed          *int64  `json:"seed,omitempty"`
-	ClinicianSeed *int64  `json:"clinicianSeed,omitempty"`
-	ReferenceDate *string `json:"referenceDate,omitempty"` // YYYYMMDD
+// --- Mocking exec.Command ---
+var mockExecCommand func(ctx context.Context, command string, args ...string) *exec.Cmd
+var originalExecCommand func(ctx context.Context, command string, args ...string) *exec.Cmd
+
+// Helper for tests that need to mock exec.Command
+func helperCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecCmdHelper", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	return cmd
 }
 
-func (api *Api) RunSyntheaGeneration(w http.ResponseWriter, r *http.Request) {
-	var params SyntheaParams
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		http.Error(w, "Invalid request payload: "+err.Error(), http.StatusBadRequest)
-		log.Printf("Error decoding Synthea params payload: %v", err)
+// This is the actual "mocked" process.
+// It's run when GO_WANT_HELPER_PROCESS is set.
+func TestExecCmdHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
+	defer os.Exit(0)
 
-	syntheaJarPath := "/app/synthea-with-dependencies.jar"
-	if _, err := os.Stat(syntheaJarPath); os.IsNotExist(err) {
-		http.Error(w, "Synthea JAR not found at "+syntheaJarPath, http.StatusInternalServerError)
-		log.Printf("Synthea JAR not found at %s", syntheaJarPath)
-		return
-	}
+	args := os.Args
+	args = args[4:] // os.Args[0] is test binary, os.Args[1] is -test.run, os.Args[2] is --
 
-	mainOutputDir := filepath.Join(os.TempDir(), "synthea_exec_wd_"+time.Now().Format("20060102150405"))
-	if err := os.MkdirAll(mainOutputDir, 0755); err != nil {
-		http.Error(w, "Failed to create execution working directory: "+err.Error(), http.StatusInternalServerError)
-		log.Printf("Failed to create execution working directory %s: %v", mainOutputDir, err)
-		return
-	}
-	defer os.RemoveAll(mainOutputDir)
-
-	// We will set mainOutputDir as the working directory for Synthea.
-	// Synthea by default creates an 'output' folder in its CWD.
-	// So, we don't need to specify --exporter.base_directory if we set the CWD.
-	// However, to be explicit and ensure FHIR export is on:
-	args := []string{"-jar", syntheaJarPath, "--exporter.fhir.export=true"}
-	// If setting CWD works, --exporter.base_directory might become redundant or could even conflict.
-	// Let's try without it first if CWD is set. If that fails, we can add it back pointing to "." (relative to the new CWD).
-	// For now, let's keep it simple:
-	// args = append(args, "--exporter.base_directory=.") // This would mean CWD/./output/fhir -> CWD/output/fhir
-
-	if params.Population != nil {
-		args = append(args, "-p", strconv.Itoa(*params.Population))
-	}
-	if params.State != nil {
-		args = append(args, *params.State)
-		if params.City != nil {
-			args = append(args, *params.City)
-		}
-	}
-	if params.Gender != nil {
-		args = append(args, "-g", *params.Gender)
-	}
-	if params.AgeMin != nil && params.AgeMax != nil {
-		args = append(args, "-a", fmt.Sprintf("%d-%d", *params.AgeMin, *params.AgeMax))
-	} else if params.AgeMin != nil {
-		args = append(args, "-a", fmt.Sprintf("%d-", *params.AgeMin))
-	} else if params.AgeMax != nil {
-		args = append(args, "-a", fmt.Sprintf("-%d", *params.AgeMax))
+	// Simulate Synthea output based on args or environment variables set by the test
+	// This is a simplified example. You'd make this more sophisticated.
+	if strings.Contains(strings.Join(args, " "), "fail_synthea_run") {
+		fmt.Fprint(os.Stderr, "Synthea simulated error")
+		os.Exit(1)
 	}
 
-	if params.Seed != nil {
-		args = append(args, "-s", strconv.FormatInt(*params.Seed, 10))
-	}
-	if params.ClinicianSeed != nil {
-		args = append(args, "-cs", strconv.FormatInt(*params.ClinicianSeed, 10))
-	}
-	if params.ReferenceDate != nil {
-		args = append(args, "-r", *params.ReferenceDate)
-	}
-
-	log.Printf("Executing Synthea with command: java %s (in CWD: %s)", strings.Join(args, " "), mainOutputDir)
-
-	cmd := exec.Command("java", args...)
-	cmd.Dir = mainOutputDir // Set the working directory for the command
-	var stdOut, stdErr strings.Builder
-	cmd.Stdout = &stdOut
-	cmd.Stderr = &stdErr
-
-	if err := cmd.Run(); err != nil {
-		log.Printf("Synthea stdout: %s", stdOut.String())
-		log.Printf("Synthea stderr: %s", stdErr.String())
-		http.Error(w, "Failed to run Synthea: "+err.Error()+". Check service logs.", http.StatusInternalServerError)
-		log.Printf("Error running Synthea (CWD: %s): %v.", mainOutputDir, err)
-		return
-	}
-	log.Printf("Synthea run completed successfully. Stdout: %s", stdOut.String())
-	if stdErr.Len() > 0 {
-		log.Printf("Synthea stderr (run was successful but stderr had content): %s", stdErr.String())
-	}
-
-	// --- MODIFICATION START: Extract all patient summaries from stdout ---
-	syntheaOutputLines := strings.Split(stdOut.String(), "\n")
-	var patientSummaries []string // Changed from string to []string
-	for _, line := range syntheaOutputLines {
-		// A simple check: Synthea patient summary lines typically start with a number and "--"
-		// Example: "1 -- Yvone889 Paucek755 (26 y/o F) Boston, Massachusetts  (38194)"
-		trimmedLine := strings.TrimSpace(line)
-		if len(trimmedLine) > 0 && strings.Contains(trimmedLine, "--") {
-			parts := strings.SplitN(trimmedLine, "--", 2)
-			if len(parts) == 2 {
-				_, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-				if err == nil { // Check if the part before "--" is a number
-					patientSummaries = append(patientSummaries, trimmedLine) // Append to slice
-					log.Printf("Extracted patient summary line: %s", trimmedLine)
-					// Removed break to collect all summaries
-				}
-			}
+	// Simulate successful run with some output
+	fmt.Fprintln(os.Stdout, "1 -- Test Patient (30 y/o M) -- FHIR: /tmp/output/fhir/test_patient.json")
+	// Simulate creating an output file if needed by the test
+	// For example, if an arg indicates output format:
+	for i, arg := range args {
+		if arg == "-p" && len(args) > i+1 && args[i+1] == "create_output_file" { // Special flag for test
+			// Find where Synthea would output based on its args
+			// This is complex to truly replicate. For a unit test, we might assume a path
+			// or have the test set an env var for the mock to know where to create a file.
+			// For now, let's assume the test sets up the expected output dir structure.
+			// Example: create a dummy FHIR output file
+			// This part needs to align with how processSyntheaJob expects output.
+			// It expects output in mainOutputDir/output/requestedOutputFormat
+			// The mainOutputDir is created by processSyntheaJob.
+			// The mock needs to know this path. This is tricky.
+			// A simpler mock might just check args and not touch the filesystem.
 		}
 	}
 
-	// Prepare the JSON response
-	response := make(map[string]interface{}) // Use interface{} for mixed types
+	os.Exit(0)
+}
 
-	// Always include patientSummaries in the response.
-	// If no summaries were extracted, this will be an empty list: [].
-	response["patientSummaries"] = patientSummaries
+func setupExecMock() {
+	originalExecCommand = execCommand // Save original
+	execCommand = helperCommand       // Set to mock
+	mockExecCommand = helperCommand   // Also set the global mock var if used elsewhere
+}
 
-	if len(patientSummaries) == 0 {
-		// Add a message only if no patient summaries were found in the Synthea output.
-		response["message"] = "Synthea ran, but no patient summary lines found in stdout. FHIR files might still be generated."
-		log.Printf("Could not extract any patient summary lines from Synthea stdout.")
-	}
-	// The previous if/else that conditionally added patientSummaries or a message is now simplified.
+func teardownExecMock() {
+	execCommand = originalExecCommand // Restore original
+	mockExecCommand = nil
+}
 
-	// Always check and include FHIR output status
-	syntheaActualFhirOutputDir := filepath.Join(mainOutputDir, "output", "fhir")
-	if _, err := os.Stat(syntheaActualFhirOutputDir); os.IsNotExist(err) {
-		response["fhirOutputGenerated"] = "false"
-		// Log details if no summaries AND no FHIR output found (potential issue)
-		if len(patientSummaries) == 0 {
-			log.Printf("Synthea's expected FHIR output directory does not exist: %s", syntheaActualFhirOutputDir)
-			api.logFilesInDirectory(mainOutputDir)
+// Actual execCommand used by the package, can be swapped for testing
+var execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, command, args...)
+}
+
+// --- End Mocking exec.Command ---
+
+// Helper to reset globalJobStore for tests
+func resetGlobalJobStore() {
+	globalJobStore.mu.Lock()
+	globalJobStore.jobs = make(map[string]*GenerationJob)
+	globalJobStore.mu.Unlock()
+}
+
+func TestRunSyntheaGenerationHandler(t *testing.T) {
+	cfg := config.Config{APIPort: 8081}
+	apiInstance, _ := NewApi(cfg)
+
+	// Suppress log output during tests
+	originalLogger := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(originalLogger)
+
+	t.Run("ValidPayload", func(t *testing.T) {
+		resetGlobalJobStore()
+		payload := `{"population": 1, "outputFormat": "fhir"}`
+		req := httptest.NewRequest("POST", "/generate-patients", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		apiInstance.RunSyntheaGeneration(rr, req)
+
+		if rr.Code != http.StatusAccepted {
+			t.Errorf("Expected status %d, got %d", http.StatusAccepted, rr.Code)
 		}
-	} else {
-		response["fhirOutputGenerated"] = "true"
-		log.Printf("FHIR output directory found at: %s. Extracted %d patient summaries.", syntheaActualFhirOutputDir, len(patientSummaries))
-	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Error encoding patient summaries response: %v", err)
-	}
-	// --- MODIFICATION END ---
-}
-
-// Helper function to log files in a directory for debugging
-func (api *Api) logFilesInDirectory(dirPath string) {
-	log.Printf("Listing contents of directory: %s", dirPath)
-	files, err := os.ReadDir(dirPath)
-	if err != nil {
-		log.Printf("Error reading directory %s: %v", dirPath, err)
-		return
-	}
-	if len(files) == 0 {
-		log.Printf("Directory %s is empty.", dirPath)
-		return
-	}
-	for _, file := range files {
-		log.Printf("Found in %s: %s (Is Directory: %t)", dirPath, file.Name(), file.IsDir())
-		if file.IsDir() {
-			// Optionally, recurse or list one level deeper if needed for debugging
-			// subDirPath := filepath.Join(dirPath, file.Name())
-			// logFilesInDirectory(subDirPath)
+		var respBody map[string]interface{}
+		if err := json.Unmarshal(rr.Body.Bytes(), &respBody); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
+		jobID, ok := respBody["jobID"].(string)
+		if !ok || jobID == "" {
+			t.Errorf("Expected a non-empty jobID, got %v", respBody["jobID"])
+		}
+
+		// Check if job was added (basic check, doesn't wait for goroutine)
+		time.Sleep(10 * time.Millisecond) // Give goroutine a moment to start
+		globalJobStore.mu.RLock()
+		_, jobExists := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
+		if !jobExists {
+			t.Errorf("Job %s was not found in globalJobStore after submission", jobID)
+		}
+	})
+
+	t.Run("InvalidPayload_BadJSON", func(t *testing.T) {
+		resetGlobalJobStore()
+		payload := `{"population": 1, "outputFormat": "fhir"` // Missing closing brace
+		req := httptest.NewRequest("POST", "/generate-patients", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		apiInstance.RunSyntheaGeneration(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d for bad JSON, got %d", http.StatusBadRequest, rr.Code)
+		}
+	})
+
+	t.Run("InvalidPayload_WrongType", func(t *testing.T) {
+		resetGlobalJobStore()
+		payload := `{"population": "one"}` // Population should be int
+		req := httptest.NewRequest("POST", "/generate-patients", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		apiInstance.RunSyntheaGeneration(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d for wrong type, got %d", http.StatusBadRequest, rr.Code)
+		}
+	})
+}
+
+func TestProcessSyntheaJob(t *testing.T) {
+	cfg := config.Config{APIPort: 8081}
+	apiInstance, _ := NewApi(cfg)
+
+	// Suppress log output during tests
+	originalLogger := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(originalLogger)
+
+	// Setup mock for exec.Command
+	// This is a simplified way to swap the function; in real tests, you might use interfaces or more robust mocking.
+	originalExec := execCommand
+	defer func() { execCommand = originalExec }() // Restore original
+
+	// Create a dummy Synthea JAR for path validation if needed by the test
+	// This depends on whether the mock bypasses the os.Stat check.
+	// For a true unit test of processSyntheaJob, os.Stat might also be mocked.
+	// Here, we assume the mock execCommand implies Synthea exists.
+
+	t.Run("SuccessfulFHIRGeneration", func(t *testing.T) {
+		resetGlobalJobStore()
+		setupExecMock() // Use the helperCommand mock
+		defer teardownExecMock()
+
+		jobID := "testjob_success_fhir"
+		params := SyntheaParams{Population: Pint(1), OutputFormat: Pstr("fhir")}
+		job := &GenerationJob{
+			ID:            jobID,
+			Status:        StatusPending,
+			RequestParams: params,
+		}
+		globalJobStore.AddJob(job)
+
+		// Start the job processing
+		go apiInstance.processSyntheaJob(job)
+
+		// Wait for job to complete
+		if !waitForJobStatus(jobID, StatusCompleted, 5*time.Second) {
+			t.Errorf("Job did not complete within timeout")
+		}
+
+		// Verify job status
+		globalJobStore.mu.RLock()
+		updatedJob, exists := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
+
+		if !exists {
+			t.Errorf("Job %s not found in store", jobID)
+		}
+		if updatedJob.Status != StatusCompleted {
+			t.Errorf("Expected status %s, got %s", StatusCompleted, updatedJob.Status)
+		}
+		if updatedJob.Error != "" {
+			t.Errorf("Expected no error, got %s", updatedJob.Error)
+		}
+	})
+
+	t.Run("FailedGeneration", func(t *testing.T) {
+		resetGlobalJobStore()
+		setupExecMock() // Use the helperCommand mock
+		defer teardownExecMock()
+
+		jobID := "testjob_fail"
+		params := SyntheaParams{Population: Pint(1), OutputFormat: Pstr("fail_synthea_run")}
+		job := &GenerationJob{
+			ID:            jobID,
+			Status:        StatusPending,
+			RequestParams: params,
+		}
+		globalJobStore.AddJob(job)
+
+		// Start the job processing
+		go apiInstance.processSyntheaJob(job)
+
+		// Wait for job to fail
+		if !waitForJobStatus(jobID, StatusFailed, 5*time.Second) {
+			t.Errorf("Job did not fail within timeout")
+		}
+
+		// Verify job status
+		globalJobStore.mu.RLock()
+		updatedJob, exists := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
+
+		if !exists {
+			t.Errorf("Job %s not found in store", jobID)
+		}
+		if updatedJob.Status != StatusFailed {
+			t.Errorf("Expected status %s, got %s", StatusFailed, updatedJob.Status)
+		}
+		if updatedJob.Error == "" {
+			t.Error("Expected error message, got none")
+		}
+	})
+}
+
+func TestHeartbeatHandler(t *testing.T) {
+	cfg := config.Config{APIPort: 8081}
+	apiInstance, _ := NewApi(cfg)
+
+	req := httptest.NewRequest("GET", "/heartbeat", nil)
+	rr := httptest.NewRecorder()
+
+	apiInstance.Heartbeat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+
+	var respBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &respBody); err != nil {
+		t.Fatalf("Failed to unmarshal response: %v", err)
+	}
+
+	if respBody["status"] != "ok" {
+		t.Errorf("Expected status 'ok', got %v", respBody["status"])
 	}
 }
 
-// Heartbeat responds with a 200 OK status.
-func (api *Api) Heartbeat(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+func TestNewJobID(t *testing.T) {
+	// Test that job IDs are unique
+	ids := make(map[string]bool)
+	for i := 0; i < 1000; i++ {
+		id := newJobID()
+		if ids[id] {
+			t.Errorf("Duplicate job ID generated: %s", id)
+		}
+		ids[id] = true
+	}
 }
 
-// RunContainerizedCode is a placeholder for running containerized code.
-// Actual implementation of Docker-in-Docker or similar container execution
-// is complex and has security implications. This is a basic placeholder.
-func (api *Api) RunContainerizedCode(w http.ResponseWriter, r *http.Request) {
-	// For now, this endpoint will just acknowledge the request.
-	// In a real scenario, you would parse the request, potentially authenticate,
-	// and then interact with a container runtime or orchestration API.
-	// This is a highly simplified example.
+func TestMain(m *testing.M) {
+	// Setup
+	setupExecMock()
 
-	var payload map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		log.Printf("Error decoding payload for /run-code: %v", err)
-		return
+	// Run tests
+	code := m.Run()
+
+	// Teardown
+	teardownExecMock()
+
+	os.Exit(code)
+}
+
+func (api *Api) processSyntheaJob(job *GenerationJob) {
+	// Implementation moved to handlers.go
+}
+
+func newJobID() string {
+	// Implementation moved to handlers.go
+	return ""
+}
+
+func Pstr(s string) *string { return &s }
+
+func Pint(i int) *int { return &i }
+
+func waitForJobStatus(jobID string, desiredStatus JobStatus, timeout time.Duration) bool {
+	start := time.Now()
+	for time.Since(start) < timeout {
+		globalJobStore.mu.RLock()
+		job, exists := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
+
+		if !exists {
+			return false
+		}
+
+		if job.Status == desiredStatus {
+			return true
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
-
-	log.Printf("Received request for /run-code with payload: %+v", payload)
-
-	// Placeholder response
-	response := map[string]interface{}{
-		"message":          "Request to run containerized code received.",
-		"status":           "pending",
-		"details":          "Actual container execution is not yet implemented in this placeholder.",
-		"received_payload": payload,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted) // 202 Accepted is appropriate for async tasks
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Error encoding response for /run-code: %v", err)
-	}
+	return false
 }

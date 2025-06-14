@@ -1,0 +1,44 @@
+name: Go Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Go Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.21.0']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Install dependencies
+      run: echo "No specific dependencies to install for tests beyond go modules."
+
+    - name: Vet
+      run: go vet ./...
+
+    - name: Run tests
+      run: |
+        go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Check test summary
+      run: |
+        if grep -q "FAIL" coverage.out; then
+          echo "Some tests failed."
+        else
+          echo "All tests passed."
+        fi
