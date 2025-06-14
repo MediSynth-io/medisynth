@@ -1,677 +1,465 @@
 package api
 
 import (
-	"bytes" // Required for capturing Synthea output in the new structure
-	"crypto/rand"
-	"encoding/hex"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"sync"
+	"testing"
 	"time"
 
+	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/go-chi/chi/v5"
 )
 
-// --- JOB MANAGEMENT ---
+// --- Mocking exec.Command ---
+var mockExecCommand func(ctx context.Context, command string, args ...string) *exec.Cmd
+var originalExecCommand func(ctx context.Context, command string, args ...string) *exec.Cmd
 
-// JobStatus represents the status of a generation job
-type JobStatus string
-
-const (
-	StatusPending   JobStatus = "pending"
-	StatusRunning   JobStatus = "running"
-	StatusCompleted JobStatus = "completed"
-	StatusFailed    JobStatus = "failed"
-)
-
-// GenerationJob holds information about an asynchronous Synthea generation task
-type GenerationJob struct {
-	ID            string
-	Status        JobStatus
-	RequestParams SyntheaParams // Store the original request params
-	Result        map[string]interface{}
-	Error         string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+// Helper for tests that need to mock exec.Command
+func helperCommand(ctx context.Context, command string, args ...string) *exec.Cmd {
+	cs := []string{"-test.run=TestExecCmdHelper", "--", command}
+	cs = append(cs, args...)
+	cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+	cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+	return cmd
 }
 
-// JobStore holds all the jobs, protected by a mutex
-type JobStore struct {
-	mu   sync.RWMutex
-	jobs map[string]*GenerationJob
-}
-
-// Global job store (or inject it into your Api struct if preferred for testing/scoping)
-var globalJobStore = &JobStore{
-	jobs: make(map[string]*GenerationJob),
-}
-
-func newJobID() string {
-	bytesArr := make([]byte, 16) // Renamed from 'bytes' to avoid conflict
-	if _, err := rand.Read(bytesArr); err != nil {
-		// Fallback for exceedingly rare error
-		return time.Now().Format(time.RFC3339Nano) + hex.EncodeToString([]byte(fmt.Sprintf("%d", time.Now().UnixNano())))
-	}
-	return hex.EncodeToString(bytesArr)
-}
-
-// --- END JOB MANAGEMENT ---
-
-// KeepCriterion defines a single criterion for the "Keep Modules".
-type KeepCriterion struct {
-	System  string `json:"system"`            // e.g., "SNOMED-CT", "RxNorm"
-	Code    string `json:"code"`              // e.g., "10029008"
-	Display string `json:"display,omitempty"` // e.g., "Suicide precautions"
-}
-
-// SyntheaParams defines the expected parameters for generating Synthea data.
-type SyntheaParams struct {
-	Population    *int    `json:"population,omitempty"`
-	State         *string `json:"state,omitempty"`
-	City          *string `json:"city,omitempty"`
-	Gender        *string `json:"gender,omitempty"` // M or F
-	AgeMin        *int    `json:"ageMin,omitempty"`
-	AgeMax        *int    `json:"ageMax,omitempty"`
-	Seed          *int64  `json:"seed,omitempty"`
-	ClinicianSeed *int64  `json:"clinicianSeed,omitempty"`
-	ReferenceDate *string `json:"referenceDate,omitempty"` // YYYYMMDD
-
-	// New fields for Keep Modules
-	KeepActiveConditions  []KeepCriterion `json:"keepActiveConditions,omitempty"`
-	KeepActiveAllergies   []KeepCriterion `json:"keepActiveAllergies,omitempty"`
-	KeepActiveProcedures  []KeepCriterion `json:"keepActiveProcedures,omitempty"`
-	KeepActiveMedications []KeepCriterion `json:"keepActiveMedications,omitempty"`
-	KeepLogic             *string         `json:"keepLogic,omitempty"`    // "AND" or "OR" for keep criteria
-	OutputFormat          *string         `json:"outputFormat,omitempty"` // "fhir", "ccda", "csv"
-
-	// New field for Custom Modules (from Module Builder, etc.)
-	// These are paths or URLs to Synthea module JSON files.
-	CustomModules []string `json:"customModules,omitempty"`
-}
-
-// --- Structs for building the Synthea Module JSON ---
-
-// ModuleCode represents a single code within a condition.
-type ModuleCode struct {
-	System  string `json:"system"`
-	Code    string `json:"code"`
-	Display string `json:"display,omitempty"`
-}
-
-// ModuleCondition represents one condition within a ConditionBlock (e.g., "Active Allergy").
-type ModuleCondition struct {
-	ConditionType string       `json:"condition_type"`
-	Codes         []ModuleCode `json:"codes"`
-}
-
-// ConditionBlock represents the "condition" block in a ConditionalTransition.
-type ConditionBlock struct {
-	ConditionType string            `json:"condition_type"` // e.g., "And", "Or"
-	Conditions    []ModuleCondition `json:"conditions"`
-}
-
-// ConditionalTransition defines a transition rule from a state.
-type ConditionalTransition struct {
-	Transition string          `json:"transition"`
-	Condition  *ConditionBlock `json:"condition,omitempty"`
-}
-
-// ModuleState represents a state in the Synthea module.
-type ModuleState struct {
-	Type                   string                  `json:"type"`
-	Name                   string                  `json:"name,omitempty"` // As seen in your example
-	DirectTransition       string                  `json:"direct_transition,omitempty"`
-	ConditionalTransitions []ConditionalTransition `json:"conditional_transition,omitempty"`
-	// Remove 'Allow' if using ConditionalTransitions primarily for logic like the example
-}
-
-// SyntheaModule is the root structure for a generic Synthea module JSON.
-type SyntheaModule struct {
-	Name       string                 `json:"name"`
-	Remarks    []string               `json:"remarks,omitempty"`
-	States     map[string]ModuleState `json:"states"`
-	GMFVersion *int                   `json:"gmf_version,omitempty"` // Pointer to allow omission
-}
-
-func (api *Api) RunSyntheaGeneration(w http.ResponseWriter, r *http.Request) {
-	var params SyntheaParams
-	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
-		http.Error(w, "Invalid request payload: "+err.Error(), http.StatusBadRequest)
-		log.Printf("Error decoding Synthea params payload: %v", err)
+// This is the actual "mocked" process.
+// It's run when GO_WANT_HELPER_PROCESS is set.
+func TestExecCmdHelper(t *testing.T) {
+	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
 	}
-	defer r.Body.Close() // Ensure body is closed
+	defer os.Exit(0)
 
-	jobID := newJobID()
-	job := &GenerationJob{
-		ID:            jobID,
-		Status:        StatusPending,
-		RequestParams: params,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+	args := os.Args
+	cmd, args := args[3], args[4:] // os.Args[0] is test binary, os.Args[1] is -test.run, os.Args[2] is --
+
+	// Simulate Synthea output based on args or environment variables set by the test
+	// This is a simplified example. You'd make this more sophisticated.
+	if strings.Contains(strings.Join(args, " "), "fail_synthea_run") {
+		fmt.Fprint(os.Stderr, "Synthea simulated error")
+		os.Exit(1)
 	}
 
+	// Simulate successful run with some output
+	fmt.Fprintln(os.Stdout, "1 -- Test Patient (30 y/o M) -- FHIR: /tmp/output/fhir/test_patient.json")
+	// Simulate creating an output file if needed by the test
+	// For example, if an arg indicates output format:
+	outputDir := "." // Current dir of the mocked command
+	for i, arg := range args {
+		if arg == "-p" && len(args) > i+1 && args[i+1] == "create_output_file" { // Special flag for test
+			// Find where Synthea would output based on its args
+			// This is complex to truly replicate. For a unit test, we might assume a path
+			// or have the test set an env var for the mock to know where to create a file.
+			// For now, let's assume the test sets up the expected output dir structure.
+			// Example: create a dummy FHIR output file
+			// This part needs to align with how processSyntheaJob expects output.
+			// It expects output in mainOutputDir/output/requestedOutputFormat
+			// The mainOutputDir is created by processSyntheaJob.
+			// The mock needs to know this path. This is tricky.
+			// A simpler mock might just check args and not touch the filesystem.
+		}
+	}
+
+	os.Exit(0)
+}
+
+func setupExecMock() {
+	originalExecCommand = execCommand // Save original
+	execCommand = helperCommand       // Set to mock
+	mockExecCommand = helperCommand   // Also set the global mock var if used elsewhere
+}
+
+func teardownExecMock() {
+	execCommand = originalExecCommand // Restore original
+	mockExecCommand = nil
+}
+
+// Actual execCommand used by the package, can be swapped for testing
+var execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+	return exec.CommandContext(ctx, command, args...)
+}
+
+// --- End Mocking exec.Command ---
+
+// Helper to reset globalJobStore for tests
+func resetGlobalJobStore() {
 	globalJobStore.mu.Lock()
-	globalJobStore.jobs[jobID] = job
+	globalJobStore.jobs = make(map[string]*GenerationJob)
 	globalJobStore.mu.Unlock()
-
-	log.Printf("Job %s created for Synthea generation.", jobID)
-	go api.processSyntheaJob(job) // Process in background
-
-	response := map[string]interface{}{
-		"jobID":     jobID,
-		"status":    string(StatusPending),
-		"message":   "Synthea generation request accepted. Check status using the jobID.",
-		"statusUrl": fmt.Sprintf("%s/generation-status/%s", r.Host, jobID), // Construct a helpful URL
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted) // 202 Accepted
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Job %s: Error encoding acceptance response: %v", jobID, err)
-	}
 }
 
-func (api *Api) processSyntheaJob(job *GenerationJob) {
-	globalJobStore.mu.Lock()
-	job.Status = StatusRunning
-	job.UpdatedAt = time.Now()
-	globalJobStore.mu.Unlock()
-	log.Printf("Job %s: Status changed to %s", job.ID, StatusRunning)
+func TestRunSyntheaGenerationHandler(t *testing.T) {
+	cfg := config.Config{APIPort: 8080}
+	apiInstance, _ := NewApi(cfg)
 
-	// --- Start of moved logic from original RunSyntheaGeneration ---
-	params := job.RequestParams // Use parameters from the job
+	// Suppress log output during tests
+	originalLogger := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(originalLogger)
 
-	syntheaJarPath := "/app/synthea-with-dependencies.jar" // Consider making this configurable
-	if _, err := os.Stat(syntheaJarPath); os.IsNotExist(err) {
-		log.Printf("Job %s: Synthea JAR not found at %s", job.ID, syntheaJarPath)
+	t.Run("ValidPayload", func(t *testing.T) {
+		resetGlobalJobStore()
+		payload := `{"population": 1, "outputFormat": "fhir"}`
+		req := httptest.NewRequest("POST", "/generate-patients", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		apiInstance.RunSyntheaGeneration(rr, req)
+
+		if rr.Code != http.StatusAccepted {
+			t.Errorf("Expected status %d, got %d", http.StatusAccepted, rr.Code)
+		}
+
+		var respBody map[string]interface{}
+		if err := json.Unmarshal(rr.Body.Bytes(), &respBody); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+		jobID, ok := respBody["jobID"].(string)
+		if !ok || jobID == "" {
+			t.Errorf("Expected a non-empty jobID, got %v", respBody["jobID"])
+		}
+
+		// Check if job was added (basic check, doesn't wait for goroutine)
+		time.Sleep(10 * time.Millisecond) // Give goroutine a moment to start
+		globalJobStore.mu.RLock()
+		_, jobExists := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
+		if !jobExists {
+			t.Errorf("Job %s was not found in globalJobStore after submission", jobID)
+		}
+	})
+
+	t.Run("InvalidPayload_BadJSON", func(t *testing.T) {
+		resetGlobalJobStore()
+		payload := `{"population": 1, "outputFormat": "fhir"` // Missing closing brace
+		req := httptest.NewRequest("POST", "/generate-patients", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		apiInstance.RunSyntheaGeneration(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d for bad JSON, got %d", http.StatusBadRequest, rr.Code)
+		}
+	})
+
+	t.Run("InvalidPayload_WrongType", func(t *testing.T) {
+		resetGlobalJobStore()
+		payload := `{"population": "one"}` // Population should be int
+		req := httptest.NewRequest("POST", "/generate-patients", strings.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+
+		apiInstance.RunSyntheaGeneration(rr, req)
+
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("Expected status %d for wrong type, got %d", http.StatusBadRequest, rr.Code)
+		}
+	})
+}
+
+func TestProcessSyntheaJob(t *testing.T) {
+	cfg := config.Config{APIPort: 8080}
+	apiInstance, _ := NewApi(cfg) // apiInstance not directly used by processSyntheaJob but good for consistency
+
+	// Suppress log output during tests
+	originalLogger := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(originalLogger)
+
+	// Setup mock for exec.Command
+	// This is a simplified way to swap the function; in real tests, you might use interfaces or more robust mocking.
+	originalExec := execCommand
+	defer func() { execCommand = originalExec }() // Restore original
+
+	// Create a dummy Synthea JAR for path validation if needed by the test
+	// This depends on whether the mock bypasses the os.Stat check.
+	// For a true unit test of processSyntheaJob, os.Stat might also be mocked.
+	// Here, we assume the mock execCommand implies Synthea exists.
+
+	t.Run("SuccessfulFHIRGeneration", func(t *testing.T) {
+		resetGlobalJobStore()
+		setupExecMock() // Use the helperCommand mock
+		defer teardownExecMock()
+
+		jobID := "testjob_success_fhir"
+		params := SyntheaParams{Population: Pint(1), OutputFormat: Pstr("fhir")}
+		job := &GenerationJob{
+			ID:            jobID,
+			Status:        StatusPending,
+			RequestParams: params,
+			CreatedAt:     time.Now(),
+		}
 		globalJobStore.mu.Lock()
-		job.Status = StatusFailed
-		job.Error = "Synthea JAR not found at " + syntheaJarPath
-		job.UpdatedAt = time.Now()
+		globalJobStore.jobs[jobID] = job
 		globalJobStore.mu.Unlock()
-		return
-	}
 
-	mainOutputDir := filepath.Join(os.TempDir(), "synthea_job_"+job.ID)
-	if err := os.MkdirAll(mainOutputDir, 0755); err != nil {
-		log.Printf("Job %s: Failed to create execution working directory %s: %v", job.ID, mainOutputDir, err)
+		// The mock TestExecCmdHelper needs to know where to "create" output.
+		// This is the hard part. The mock runs as a separate process.
+		// We can instruct the mock via environment variables or specific args.
+		// For this test, the mock will just produce stdout.
+		// The test needs to ensure the output directory structure is created by processSyntheaJob
+		// and then simulate Synthea placing files there.
+
+		// Create a temporary directory that processSyntheaJob will use
+		// and that our mock might (if it were more complex) write to.
+		expectedJobDir := filepath.Join(os.TempDir(), "synthea_job_"+jobID)
+		// defer os.RemoveAll(expectedJobDir) // processSyntheaJob should clean this up
+
+		// Simulate Synthea creating an output file
+		// This needs to happen *after* processSyntheaJob creates expectedJobDir/output/fhir
+		// This is tricky to coordinate with the mocked exec.Command.
+		// A simpler test: mock exec.Command to write to stdout, and then this test
+		// manually creates the expected file structure and content *before* asserting.
+
+		go apiInstance.processSyntheaJob(job) // Run in goroutine like real scenario
+
+		// Wait for job to complete (with timeout)
+		success := waitForJobStatus(jobID, StatusCompleted, 5*time.Second)
+		if !success {
+			t.Fatalf("Job %s did not complete successfully in time. Status: %s, Error: %s", jobID, job.Status, job.Error)
+		}
+
+		globalJobStore.mu.RLock()
+		completedJob := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
+
+		if completedJob.Status != StatusCompleted {
+			t.Errorf("Expected job status %s, got %s. Error: %s", StatusCompleted, completedJob.Status, completedJob.Error)
+		}
+		if completedJob.Error != "" {
+			t.Errorf("Expected no error, got: %s", completedJob.Error)
+		}
+		if completedJob.Result == nil {
+			t.Fatal("Expected non-nil result for completed job")
+		}
+		summaries, _ := completedJob.Result["patientSummaries"].([]string)
+		if len(summaries) == 0 || !strings.Contains(summaries[0], "Test Patient") {
+			t.Errorf("Expected patient summary from mock, got %v", summaries)
+		}
+		// To test outputFileContent, we'd need the mock to create files,
+		// or this test would create them in the expected temp dir.
+		// For now, we rely on the mock's stdout.
+	})
+
+	t.Run("SyntheaRunFailure", func(t *testing.T) {
+		resetGlobalJobStore()
+		setupExecMock()
+		defer teardownExecMock()
+
+		jobID := "testjob_fail_synthea"
+		// Pass a special arg to tell the mock to fail
+		// This requires the mock to parse its args.
+		// A simpler way is to set an environment variable that the mock checks.
+		// For this example, let's assume an arg like "fail_synthea_run"
+		// would be part of the SyntheaParams that translates to such an arg.
+		// Or, more simply, the mock is hardcoded for this test run.
+		// Let's modify the mock to check an env var for failure.
+		t.Setenv("MOCK_SYNTHEA_FAIL", "1")
+		defer t.Setenv("MOCK_SYNTHEA_FAIL", "")
+
+		// Modify the helperCommand to look for MOCK_SYNTHEA_FAIL
+		// This means TestExecCmdHelper needs to be more dynamic.
+		// For simplicity, let's assume the mock is set up to fail for this run.
+		// The current mock uses "fail_synthea_run" in args.
+		// We need to ensure our SyntheaParams would lead to this.
+		// This is where mocking gets complex.
+		// A simpler mock for this specific test:
+		execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			// Always fail for this test case
+			cs := []string{"-test.run=TestExecCmdHelper", "--", command, "fail_synthea_run"} // Force fail arg
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1"}
+			return cmd
+		}
+
+		params := SyntheaParams{Population: Pint(1)} // No special params needed if mock is forced to fail
+		job := &GenerationJob{ID: jobID, Status: StatusPending, RequestParams: params}
 		globalJobStore.mu.Lock()
-		job.Status = StatusFailed
-		job.Error = "Failed to create execution working directory: " + err.Error()
-		job.UpdatedAt = time.Now()
+		globalJobStore.jobs[jobID] = job
 		globalJobStore.mu.Unlock()
-		return
-	}
-	defer os.RemoveAll(mainOutputDir)
-	log.Printf("Job %s: Created working directory %s", job.ID, mainOutputDir)
 
-	requestedOutputFormat := "fhir"
-	if params.OutputFormat != nil && *params.OutputFormat != "" {
-		validFormats := map[string]bool{"fhir": true, "ccda": true, "csv": true}
-		if _, isValid := validFormats[strings.ToLower(*params.OutputFormat)]; isValid {
-			requestedOutputFormat = strings.ToLower(*params.OutputFormat)
-		} else {
-			log.Printf("Job %s: Warning: Invalid outputFormat '%s' requested. Defaulting to 'fhir'.", job.ID, *params.OutputFormat)
+		go apiInstance.processSyntheaJob(job)
+		success := waitForJobStatus(jobID, StatusFailed, 5*time.Second)
+		if !success {
+			t.Fatalf("Job %s did not fail in time. Status: %s", jobID, job.Status)
 		}
-	}
-	log.Printf("Job %s: Using output format: %s", job.ID, requestedOutputFormat)
 
-	args := []string{"-Dgenerate.max_attempts_to_keep_patient=5000", "-jar", syntheaJarPath}
-	args = append(args, fmt.Sprintf("--exporter.%s.export=true", requestedOutputFormat))
+		globalJobStore.mu.RLock()
+		failedJob := globalJobStore.jobs[jobID]
+		globalJobStore.mu.RUnlock()
 
-	var moduleConditions []ModuleCondition
-	addCriteria := func(criteria []KeepCriterion, syntheaConditionType string) {
-		for _, c := range criteria {
-			if c.Code == "" || c.System == "" {
-				log.Printf("Job %s: Skipping invalid KeepCriterion for %s: %+v", job.ID, syntheaConditionType, c)
-				continue
-			}
-			moduleConditions = append(moduleConditions, ModuleCondition{
-				ConditionType: syntheaConditionType,
-				Codes: []ModuleCode{{
-					System:  c.System,
-					Code:    c.Code,
-					Display: c.Display,
-				}},
-			})
+		if failedJob.Status != StatusFailed {
+			t.Errorf("Expected job status %s, got %s", StatusFailed, failedJob.Status)
 		}
-	}
-
-	addCriteria(params.KeepActiveConditions, "Active Condition")
-	addCriteria(params.KeepActiveAllergies, "Active Allergy")
-	addCriteria(params.KeepActiveProcedures, "Procedure")
-	addCriteria(params.KeepActiveMedications, "Active Medication")
-
-	if len(moduleConditions) > 0 {
-		gmfVersion := 2
-		keepLogicConditionType := "And"
-		if params.KeepLogic != nil {
-			if strings.ToUpper(*params.KeepLogic) == "OR" {
-				keepLogicConditionType = "Or"
-			} else if strings.ToUpper(*params.KeepLogic) == "AND" {
-				// Default is already "And", so this is fine
-			} else {
-				log.Printf("Job %s: Warning: Invalid value for keepLogic '%s'. Defaulting to 'And'.", job.ID, *params.KeepLogic)
-			}
+		if failedJob.Error == "" {
+			t.Error("Expected an error message for failed job")
 		}
-		log.Printf("Job %s: Using '%s' logic for combining keep criteria.", job.ID, keepLogicConditionType)
-
-		keepModule := SyntheaModule{
-			Name:       "Medisynth Generated Keep Module for Job " + job.ID,
-			GMFVersion: &gmfVersion,
-			States: map[string]ModuleState{
-				"Initial": {
-					Type: "Initial", Name: "Initial",
-					ConditionalTransitions: []ConditionalTransition{
-						{
-							Transition: "Keep",
-							Condition: &ConditionBlock{
-								ConditionType: keepLogicConditionType,
-								Conditions:    moduleConditions,
-							},
-						},
-						{Transition: "Terminal"},
-					},
-				},
-				"Keep":     {Type: "Terminal", Name: "Keep"},
-				"Terminal": {Type: "Terminal", Name: "Terminal"},
-			},
+		if !strings.Contains(failedJob.Error, "Synthea simulated error") {
+			t.Errorf("Expected error to contain 'Synthea simulated error', got '%s'", failedJob.Error)
 		}
-		keepModuleFilePath := filepath.Join(mainOutputDir, "medisynth_generated_keep_module.json")
-		keepModuleFile, err := os.Create(keepModuleFilePath)
-		if err != nil {
-			log.Printf("Job %s: Error creating keep module file %s: %v", job.ID, keepModuleFilePath, err)
-			globalJobStore.mu.Lock()
-			job.Status = StatusFailed
-			job.Error = "Failed to create keep module file: " + err.Error()
-			job.UpdatedAt = time.Now()
-			globalJobStore.mu.Unlock()
-			return
-		}
-		encoder := json.NewEncoder(keepModuleFile)
-		encoder.SetIndent("", "  ")
-		if err := encoder.Encode(keepModule); err != nil {
-			keepModuleFile.Close()
-			log.Printf("Job %s: Error encoding keep module JSON to %s: %v", job.ID, keepModuleFilePath, err)
-			globalJobStore.mu.Lock()
-			job.Status = StatusFailed
-			job.Error = "Failed to encode keep module JSON: " + err.Error()
-			job.UpdatedAt = time.Now()
-			globalJobStore.mu.Unlock()
-			return
-		}
-		if err := keepModuleFile.Close(); err != nil {
-			log.Printf("Job %s: Error closing keep module file %s: %v", job.ID, keepModuleFilePath, err)
-			globalJobStore.mu.Lock()
-			job.Status = StatusFailed
-			job.Error = "Failed to close keep module file: " + err.Error()
-			job.UpdatedAt = time.Now()
-			globalJobStore.mu.Unlock()
-			return
-		}
-		args = append(args, "-k", keepModuleFilePath)
-		log.Printf("Job %s: Generated Keep Module for -k flag at: %s", job.ID, keepModuleFilePath)
-	}
+	})
 
-	if len(params.CustomModules) > 0 {
-		for _, modulePathOrURL := range params.CustomModules {
-			if strings.TrimSpace(modulePathOrURL) != "" {
-				args = append(args, "-m", strings.TrimSpace(modulePathOrURL))
-				log.Printf("Job %s: Adding custom module: %s", job.ID, strings.TrimSpace(modulePathOrURL))
-			}
+	// TODO: Add tests for Keep Module generation logic
+	// TODO: Add tests for CSV and CCDA output processing
+	// TODO: Add test for CustomModules
+}
+
+func TestGetGenerationStatusHandler(t *testing.T) {
+	cfg := config.Config{APIPort: 8080}
+	apiInstance, _ := NewApi(cfg)
+	router := chi.NewRouter() // Need a router for chi.URLParam
+	router.Get("/generation-status/{jobID}", apiInstance.GetGenerationStatus)
+
+	// Suppress log output during tests
+	originalLogger := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(originalLogger)
+
+	t.Run("JobNotFound", func(t *testing.T) {
+		resetGlobalJobStore()
+		req := httptest.NewRequest("GET", "/generation-status/nonexistentjob", nil)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req) // Use the router to serve
+
+		if rr.Code != http.StatusNotFound {
+			t.Errorf("Expected status %d for non-existent job, got %d", http.StatusNotFound, rr.Code)
 		}
-	}
+	})
 
-	if params.Population != nil {
-		args = append(args, "-p", strconv.Itoa(*params.Population))
-	} else { // Default population if not provided
-		args = append(args, "-p", "1")
-	}
-	if params.State != nil {
-		args = append(args, *params.State)
-		if params.City != nil {
-			args = append(args, *params.City)
+	t.Run("JobCompleted", func(t *testing.T) {
+		resetGlobalJobStore()
+		jobID := "completedjob"
+		completedJob := &GenerationJob{
+			ID:        jobID,
+			Status:    StatusCompleted,
+			Result:    map[string]interface{}{"data": "patient data"},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
 		}
-	}
-	if params.Gender != nil {
-		args = append(args, "-g", *params.Gender)
-	}
-	if params.AgeMin != nil && params.AgeMax != nil {
-		args = append(args, "-a", fmt.Sprintf("%d-%d", *params.AgeMin, *params.AgeMax))
-	} else if params.AgeMin != nil {
-		args = append(args, "-a", fmt.Sprintf("%d-", *params.AgeMin))
-	} else if params.AgeMax != nil {
-		args = append(args, "-a", fmt.Sprintf("-%d", *params.AgeMax))
-	}
-	if params.Seed != nil {
-		args = append(args, "-s", strconv.FormatInt(*params.Seed, 10))
-	}
-	if params.ClinicianSeed != nil {
-		args = append(args, "-cs", strconv.FormatInt(*params.ClinicianSeed, 10))
-	}
-	if params.ReferenceDate != nil {
-		args = append(args, "-r", *params.ReferenceDate)
-	}
-
-	log.Printf("Job %s: Executing Synthea with command: java %s (in CWD: %s)", job.ID, strings.Join(args, " "), mainOutputDir)
-
-	cmd := exec.Command("java", args...)
-	cmd.Dir = mainOutputDir
-	var stdOut, stdErr bytes.Buffer // Use bytes.Buffer for more control
-	cmd.Stdout = &stdOut
-	cmd.Stderr = &stdErr
-
-	if err := cmd.Run(); err != nil {
-		log.Printf("Job %s: Synthea stdout: %s", job.ID, stdOut.String())
-		log.Printf("Job %s: Synthea stderr: %s", job.ID, stdErr.String())
-		log.Printf("Job %s: Error running Synthea (CWD: %s): %v.", job.ID, mainOutputDir, err)
 		globalJobStore.mu.Lock()
-		job.Status = StatusFailed
-		job.Error = "Failed to run Synthea: " + err.Error() + ". Stderr: " + stdErr.String()
-		job.UpdatedAt = time.Now()
+		globalJobStore.jobs[jobID] = completedJob
 		globalJobStore.mu.Unlock()
-		return
-	}
-	log.Printf("Job %s: Synthea run completed successfully. Stdout: %s", job.ID, stdOut.String())
-	if stdErr.Len() > 0 {
-		log.Printf("Job %s: Synthea stderr (run was successful but stderr had content): %s", job.ID, stdErr.String())
-	}
 
-	syntheaOutputLines := strings.Split(stdOut.String(), "\n")
-	var patientSummaries []string
-	for _, line := range syntheaOutputLines {
-		trimmedLine := strings.TrimSpace(line)
-		if len(trimmedLine) > 0 && strings.Contains(trimmedLine, "--") {
-			parts := strings.SplitN(trimmedLine, "--", 2)
-			if len(parts) == 2 {
-				_, err := strconv.Atoi(strings.TrimSpace(parts[0]))
-				if err == nil {
-					patientSummaries = append(patientSummaries, trimmedLine)
-					log.Printf("Job %s: Extracted patient summary line: %s", job.ID, trimmedLine)
-				}
+		req := httptest.NewRequest("GET", "/generation-status/"+jobID, nil)
+		rr := httptest.NewRecorder()
+		router.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusOK {
+			t.Errorf("Expected status %d for completed job, got %d", http.StatusOK, rr.Code)
+		}
+		var respBody map[string]interface{}
+		if err := json.Unmarshal(rr.Body.Bytes(), &respBody); err != nil {
+			t.Fatalf("Failed to unmarshal response: %v", err)
+		}
+		if respBody["status"] != string(StatusCompleted) {
+			t.Errorf("Expected status '%s', got '%s'", StatusCompleted, respBody["status"])
+		}
+		if respBody["data"] != "patient data" {
+			t.Errorf("Expected data 'patient data', got '%v'", respBody["data"])
+		}
+	})
+
+	// TODO: Add tests for Pending, Running, Failed statuses
+}
+
+func TestHeartbeatHandler(t *testing.T) {
+	cfg := config.Config{APIPort: 8080}
+	apiInstance, _ := NewApi(cfg)
+
+	req := httptest.NewRequest("GET", "/heartbeat", nil)
+	rr := httptest.NewRecorder()
+	apiInstance.Heartbeat(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, rr.Code)
+	}
+	var respBody map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &respBody); err != nil {
+		t.Fatalf("Failed to unmarshal heartbeat response: %v", err)
+	}
+	if respBody["status"] != "ok" {
+		t.Errorf("Expected status 'ok', got '%s'", respBody["status"])
+	}
+}
+
+func TestNewJobID(t *testing.T) {
+	id1 := newJobID()
+	id2 := newJobID()
+
+	if id1 == "" {
+		t.Error("newJobID returned an empty string")
+	}
+	if len(id1) != 32 { // 16 bytes * 2 hex chars
+		t.Errorf("Expected job ID length 32, got %d", len(id1))
+	}
+	if id1 == id2 {
+		t.Error("newJobID returned identical IDs on sequential calls")
+	}
+}
+
+// Helper for pointer to string
+func Pstr(s string) *string { return &s }
+
+// Helper for pointer to int
+func Pint(i int) *int { return &i }
+
+// waitForJobStatus polls for a job to reach a desired status or timeout
+func waitForJobStatus(jobID string, desiredStatus JobStatus, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(50 * time.Millisecond) // Poll frequently
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done(): // Timeout
+			globalJobStore.mu.RLock()
+			job, exists := globalJobStore.jobs[jobID]
+			status := StatusPending
+			if exists {
+				status = job.Status
+			}
+			globalJobStore.mu.RUnlock()
+			log.Printf("Timeout waiting for job %s to reach status %s. Current status: %s", jobID, desiredStatus, status)
+			return false
+		case <-ticker.C:
+			globalJobStore.mu.RLock()
+			job, exists := globalJobStore.jobs[jobID]
+			globalJobStore.mu.RUnlock()
+
+			if exists && job.Status == desiredStatus {
+				return true
+			}
+			if exists && (job.Status == StatusFailed && desiredStatus != StatusFailed) {
+				log.Printf("Job %s reached status Failed while waiting for %s. Error: %s", jobID, desiredStatus, job.Error)
+				return false // Job failed while we were waiting for something else
 			}
 		}
 	}
-
-	finalResponse := make(map[string]interface{})
-	finalResponse["patientSummaries"] = patientSummaries
-	finalResponse["outputFormatUsed"] = requestedOutputFormat
-
-	if len(patientSummaries) == 0 {
-		finalResponse["message"] = "Synthea ran, but no patient summary lines found in stdout. Output files might still be generated."
-		log.Printf("Job %s: Could not extract any patient summary lines from Synthea stdout.", job.ID)
-	}
-
-	syntheaActualOutputSubDir := filepath.Join(mainOutputDir, "output", requestedOutputFormat)
-	outputGenerated := false
-	if _, err := os.Stat(syntheaActualOutputSubDir); os.IsNotExist(err) {
-		finalResponse["outputGenerated"] = "false"
-		if len(patientSummaries) == 0 {
-			log.Printf("Job %s: Synthea's expected output directory does not exist: %s", job.ID, syntheaActualOutputSubDir)
-			// api.logFilesInDirectory(mainOutputDir) // logFilesInDirectory is a method on Api, can't call directly here without 'api' instance
-		}
-	} else {
-		finalResponse["outputGenerated"] = "true"
-		outputGenerated = true
-		log.Printf("Job %s: Output directory found at: %s. Extracted %d patient summaries.", job.ID, syntheaActualOutputSubDir, len(patientSummaries))
-	}
-
-	var outputFileContentList []interface{}
-	if outputGenerated && len(patientSummaries) > 0 {
-		files, err := os.ReadDir(syntheaActualOutputSubDir)
-		if err != nil {
-			log.Printf("Job %s: Error reading output directory %s for content extraction: %v", job.ID, syntheaActualOutputSubDir, err)
-		} else {
-			if len(patientSummaries) == 1 {
-				foundPatientFile := false
-				for _, file := range files {
-					if file.IsDir() {
-						continue
-					}
-					fileName := file.Name()
-					filePath := filepath.Join(syntheaActualOutputSubDir, fileName)
-					fileBytes, readErr := os.ReadFile(filePath)
-					if readErr != nil {
-						log.Printf("Job %s: Error reading potential output file %s: %v", job.ID, filePath, readErr)
-						continue
-					}
-					if requestedOutputFormat == "fhir" {
-						if strings.HasSuffix(fileName, ".json") && fileName != "practitionerInformation.json" && fileName != "hospitalInformation.json" && fileName != "payerInformation.json" {
-							var bundleData interface{}
-							if unmarshalErr := json.Unmarshal(fileBytes, &bundleData); unmarshalErr == nil {
-								if bundleMap, ok := bundleData.(map[string]interface{}); ok {
-									if resourceType, ok := bundleMap["resourceType"].(string); ok && resourceType == "Bundle" {
-										outputFileContentList = append(outputFileContentList, bundleData)
-										log.Printf("Job %s: Added FHIR bundle from file: %s to response", job.ID, fileName)
-										foundPatientFile = true
-										break
-									}
-								}
-							}
-						}
-					} else if requestedOutputFormat == "ccda" {
-						if strings.HasSuffix(fileName, ".xml") {
-							outputFileContentList = append(outputFileContentList, string(fileBytes))
-							log.Printf("Job %s: Added CCDA content from file: %s to response", job.ID, fileName)
-							foundPatientFile = true
-							break
-						}
-					} else if requestedOutputFormat == "csv" {
-						if fileName == "patients.csv" {
-							outputFileContentList = append(outputFileContentList, string(fileBytes))
-							log.Printf("Job %s: Added CSV content from file: %s to response", job.ID, fileName)
-							foundPatientFile = true
-							break
-						} else if strings.HasSuffix(fileName, ".csv") && !foundPatientFile {
-							outputFileContentList = append(outputFileContentList, string(fileBytes))
-							log.Printf("Job %s: Added CSV content (fallback) from file: %s to response", job.ID, fileName)
-							foundPatientFile = true
-						}
-					}
-				}
-				if !foundPatientFile && requestedOutputFormat == "csv" && len(outputFileContentList) > 0 {
-				} else if !foundPatientFile {
-					log.Printf("Job %s: Could not find a suitable primary output file for the single patient summary in %s for format %s", job.ID, syntheaActualOutputSubDir, requestedOutputFormat)
-				}
-			} else if len(patientSummaries) > 1 {
-				log.Printf("Job %s: Multiple patient summaries found (%d). Attempting to process for supported formats.", job.ID, len(patientSummaries))
-				if requestedOutputFormat == "fhir" {
-					log.Printf("Job %s: FHIR output for multiple patients: collecting all patient bundles.", job.ID)
-					for _, file := range files {
-						if file.IsDir() {
-							continue
-						}
-						fileName := file.Name()
-						if fileName == "practitionerInformation.json" || fileName == "hospitalInformation.json" || fileName == "payerInformation.json" {
-							continue
-						}
-						if strings.HasSuffix(fileName, ".json") {
-							filePath := filepath.Join(syntheaActualOutputSubDir, fileName)
-							fileBytes, readErr := os.ReadFile(filePath)
-							if readErr != nil {
-								log.Printf("Job %s: Error reading potential FHIR bundle %s: %v", job.ID, filePath, readErr)
-								continue
-							}
-							var bundleData interface{}
-							if unmarshalErr := json.Unmarshal(fileBytes, &bundleData); unmarshalErr == nil {
-								if bundleMap, ok := bundleData.(map[string]interface{}); ok {
-									if resourceType, ok := bundleMap["resourceType"].(string); ok && resourceType == "Bundle" {
-										outputFileContentList = append(outputFileContentList, bundleData)
-										log.Printf("Job %s: Added FHIR bundle from file: %s to response list (multiple patients)", job.ID, fileName)
-									}
-								}
-							} else {
-								log.Printf("Job %s: Error unmarshalling potential FHIR bundle %s (multiple patients): %v", job.ID, filePath, unmarshalErr)
-							}
-						}
-					}
-				} else if requestedOutputFormat == "csv" {
-					log.Printf("Job %s: CSV output for multiple patients: collecting all CSV files.", job.ID)
-					for _, file := range files {
-						if file.IsDir() {
-							continue
-						}
-						fileName := file.Name()
-						if strings.HasSuffix(fileName, ".csv") {
-							filePath := filepath.Join(syntheaActualOutputSubDir, fileName)
-							fileBytes, readErr := os.ReadFile(filePath)
-							if readErr != nil {
-								log.Printf("Job %s: Error reading CSV file %s: %v", job.ID, filePath, readErr)
-								continue
-							}
-							outputFileContentList = append(outputFileContentList, map[string]string{"fileName": fileName, "content": string(fileBytes)})
-							log.Printf("Job %s: Added CSV file to response object: %s (multiple patients)", job.ID, fileName)
-						}
-					}
-				} else {
-					log.Printf("Job %s: Automatic output file inclusion in response for format '%s' with multiple patients is not fully implemented. No file content will be added.", job.ID, requestedOutputFormat)
-				}
-			}
-		}
-	}
-
-	if requestedOutputFormat == "csv" {
-		if len(outputFileContentList) > 0 {
-			finalResponse["outputFileContent"] = outputFileContentList
-		} else {
-			finalResponse["outputFileContent"] = nil
-		}
-	} else {
-		if len(outputFileContentList) == 1 {
-			finalResponse["outputFileContent"] = outputFileContentList[0]
-		} else if len(outputFileContentList) > 0 {
-			finalResponse["outputFileContent"] = outputFileContentList
-		} else {
-			finalResponse["outputFileContent"] = nil
-		}
-	}
-	finalResponse["nameFormatExplanation"] = "Patient names (e.g., Alicia629) are generated by Synthea. The appended numbers are part of its synthetic data generation process to help ensure uniqueness or due to its naming algorithms."
-	// --- End of moved logic ---
-
-	globalJobStore.mu.Lock()
-	job.Status = StatusCompleted
-	job.Result = finalResponse
-	job.UpdatedAt = time.Now()
-	globalJobStore.mu.Unlock()
-	log.Printf("Job %s: Status changed to %s", job.ID, StatusCompleted)
 }
 
-func (api *Api) GetGenerationStatus(w http.ResponseWriter, r *http.Request) {
-	jobID := chi.URLParam(r, "jobID") // Use Chi's URLParam helper
-	if jobID == "" {
-		http.Error(w, "Missing jobID in path", http.StatusBadRequest)
-		return
-	}
-
-	globalJobStore.mu.RLock()
-	job, exists := globalJobStore.jobs[jobID]
-	globalJobStore.mu.RUnlock()
-
-	w.Header().Set("Content-Type", "application/json")
-
-	if !exists {
-		http.Error(w, "Job not found", http.StatusNotFound)
-		return
-	}
-
-	response := make(map[string]interface{})
-	response["jobID"] = job.ID
-	response["status"] = string(job.Status)
-	response["createdAt"] = job.CreatedAt.Format(time.RFC3339)
-	response["updatedAt"] = job.UpdatedAt.Format(time.RFC3339)
-
-	switch job.Status {
-	case StatusCompleted:
-		// Merge the job result into the status response
-		for k, v := range job.Result {
-			response[k] = v
-		}
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Job %s: Error encoding completed status response: %v", jobID, err)
-		}
-	case StatusFailed:
-		response["error"] = job.Error
-		// Consider returning a 500 or other appropriate status if it's a server failure
-		w.WriteHeader(http.StatusOK) // Or http.StatusInternalServerError if the error implies server fault
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Job %s: Error encoding failed status response: %v", jobID, err)
-		}
-	case StatusPending, StatusRunning:
-		w.Header().Set("Retry-After", "30") // Suggest client retries after 30 seconds
-		if err := json.NewEncoder(w).Encode(response); err != nil {
-			log.Printf("Job %s: Error encoding pending/running status response: %v", jobID, err)
-		}
-	default:
-		log.Printf("Job %s: Unknown job status encountered: %s", jobID, job.Status)
-		http.Error(w, "Unknown job status", http.StatusInternalServerError)
-	}
-}
-
-// Helper function to log files in a directory for debugging
-func (api *Api) logFilesInDirectory(dirPath string) {
-	log.Printf("Listing contents of directory: %s", dirPath)
-	files, err := os.ReadDir(dirPath)
-	if err != nil {
-		log.Printf("Error reading directory %s: %v", dirPath, err)
-		return
-	}
-	if len(files) == 0 {
-		log.Printf("Directory %s is empty.", dirPath)
-		return
-	}
-	for _, file := range files {
-		log.Printf("Found in %s: %s (Is Directory: %t)", dirPath, file.Name(), file.IsDir())
-		if file.IsDir() {
-			// Optionally, recurse or list one level deeper if needed for debugging
-			// subDirPath := filepath.Join(dirPath, file.Name())
-			// logFilesInDirectory(subDirPath) // This would need 'api' instance or be a static func
+// This ensures the TestExecCmdHelper is compiled into the test binary.
+// It's a common pattern for testing exec.Command.
+func TestMain(m *testing.M) {
+	// Check if we are in the helper process
+	for _, arg := range os.Args {
+		if arg == "-test.run=TestExecCmdHelper" && os.Getenv("GO_WANT_HELPER_PROCESS") == "1" {
+			// This call will be handled by TestExecCmdHelper itself.
+			// It will call os.Exit, so m.Run() won't be reached in the helper.
+			break
 		}
 	}
-}
-
-// Heartbeat responds with a 200 OK status.
-func (api *Api) Heartbeat(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-}
-
-// RunContainerizedCode is a placeholder for running containerized code.
-// Actual implementation of Docker-in-Docker or similar container execution
-// is complex and has security implications. This is a basic placeholder.
-func (api *Api) RunContainerizedCode(w http.ResponseWriter, r *http.Request) {
-	// For now, this endpoint will just acknowledge the request.
-	// In a real scenario, you would parse the request, potentially authenticate,
-	// and then interact with a container runtime or orchestration API.
-	// This is a highly simplified example.
-
-	var payload map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		log.Printf("Error decoding payload for /run-code: %v", err)
-		return
-	}
-
-	log.Printf("Received request for /run-code with payload: %+v", payload)
-
-	// Placeholder response
-	response := map[string]interface{}{
-		"message":          "Request to run containerized code received.",
-		"status":           "pending",
-		"details":          "Actual container execution is not yet implemented in this placeholder.",
-		"received_payload": payload,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusAccepted) // 202 Accepted is appropriate for async tasks
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Error encoding response for /run-code: %v", err)
-	}
+	os.Exit(m.Run())
 }
