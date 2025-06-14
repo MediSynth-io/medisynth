@@ -3,7 +3,6 @@ package portal
 import (
 	"context"
 	"html/template"
-	"log"
 	"net/http"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
@@ -50,14 +49,6 @@ func (p *Portal) Routes() http.Handler {
 	})
 
 	return r
-}
-
-func (p *Portal) renderTemplate(w http.ResponseWriter, tmpl string, data interface{}) {
-	err := p.templates.ExecuteTemplate(w, tmpl, data)
-	if err != nil {
-		log.Printf("Error rendering template %s: %v", tmpl, err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
 }
 
 func requireAuth(next http.Handler) http.Handler {
