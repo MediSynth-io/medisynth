@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/config"
@@ -278,6 +279,76 @@ func initSchema(db *sql.DB, dbType string) error {
 			return fmt.Errorf("failed to execute schema query: %v", err)
 		}
 	}
+
+	// Run migrations for existing databases
+	if err := runMigrations(db, dbType); err != nil {
+		log.Printf("Warning: Migration failed: %v", err)
+		// Don't fail initialization, just log the warning
+	}
+
+	return nil
+}
+
+// runMigrations runs database migrations for existing databases
+func runMigrations(db *sql.DB, dbType string) error {
+	log.Printf("Running database migrations...")
+
+	// Migration 1: Add is_admin column if it doesn't exist
+	if err := addIsAdminColumn(db, dbType); err != nil {
+		return fmt.Errorf("failed to add is_admin column: %v", err)
+	}
+
+	log.Printf("Database migrations completed successfully")
+	return nil
+}
+
+// addIsAdminColumn adds the is_admin column if it doesn't exist
+func addIsAdminColumn(db *sql.DB, dbType string) error {
+	log.Printf("Checking if is_admin column exists...")
+
+	// Check if column already exists
+	var columnExists bool
+	if dbType == "postgres" {
+		var count int
+		err := db.QueryRow(`
+			SELECT COUNT(*) 
+			FROM information_schema.columns 
+			WHERE table_name = 'users' AND column_name = 'is_admin'
+		`).Scan(&count)
+		if err != nil {
+			return err
+		}
+		columnExists = count > 0
+	} else {
+		// For SQLite, we'll just try to add the column and ignore errors if it exists
+		columnExists = false
+	}
+
+	if columnExists {
+		log.Printf("is_admin column already exists, skipping migration")
+		return nil
+	}
+
+	log.Printf("Adding is_admin column to users table...")
+
+	var query string
+	if dbType == "postgres" {
+		query = "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE"
+	} else {
+		query = "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"
+	}
+
+	_, err := db.Exec(query)
+	if err != nil {
+		// For SQLite, the column might already exist, so we'll check for specific error
+		if strings.Contains(err.Error(), "duplicate column name") {
+			log.Printf("is_admin column already exists (SQLite), skipping migration")
+			return nil
+		}
+		return err
+	}
+
+	log.Printf("Successfully added is_admin column")
 	return nil
 }
 
