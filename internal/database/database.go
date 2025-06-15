@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -92,7 +93,12 @@ func initSchema(db *sql.DB) error {
 
 // createDataDir ensures the data directory exists
 func createDataDir(dir string) error {
-	// Directory creation is handled by Docker volume mount
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		log.Printf("Data directory not found, creating: %s", dir)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create data directory: %w", err)
+		}
+	}
 	return nil
 }
 
