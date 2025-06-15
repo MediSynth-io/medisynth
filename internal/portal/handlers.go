@@ -213,7 +213,7 @@ func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/portal/tokens", http.StatusSeeOther)
+	http.Redirect(w, r, "/tokens", http.StatusSeeOther)
 }
 
 func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {

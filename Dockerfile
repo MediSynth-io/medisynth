@@ -24,5 +24,9 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 # Expose the application port
 EXPOSE 8081
 
+# Default configuration file
+ARG CONFIG_FILE=app.yml
+ENV CONFIG_FILE=$CONFIG_FILE
+
 # Run the appropriate application based on the SERVICE_TYPE environment variable
-CMD ["sh", "-c", "if [ \"$SERVICE_TYPE\" = \"portal\" ]; then ./medisynth-portal -config app.dev.yml; else ./medisynth-api -config app.dev.yml; fi"]
+CMD if [ "$SERVICE_TYPE" = "portal" ]; then ./medisynth-portal -config $CONFIG_FILE; else ./medisynth-api -config $CONFIG_FILE; fi
