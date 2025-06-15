@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
@@ -68,8 +69,16 @@ func (p *Portal) Routes() http.Handler {
 
 	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Handling home page request")
-		p.HandleHome(w, r)
+		log.Printf("Handling root request for host: %s", r.Host)
+
+		// Check if this is the main domain (medisynth.io) or subdomain (portal.medisynth.io)
+		if strings.Contains(r.Host, "portal.") {
+			// This is the portal subdomain, serve the home page
+			p.HandleHome(w, r)
+		} else {
+			// This is the main domain, serve the landing page
+			p.handleLanding(w, r)
+		}
 	})
 	r.Get("/login", p.handleLogin)
 	r.Get("/register", p.handleRegister)

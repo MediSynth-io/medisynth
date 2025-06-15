@@ -12,6 +12,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+func (p *Portal) handleLanding(w http.ResponseWriter, r *http.Request) {
+	p.renderTemplate(w, r, "landing.html", "MediSynth", map[string]interface{}{})
+}
+
 func (p *Portal) HandleHome(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "home.html", "Home", map[string]interface{}{})
 }
