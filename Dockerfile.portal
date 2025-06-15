@@ -2,12 +2,12 @@
 FROM golang:1.23-alpine AS builder
 WORKDIR /app
 COPY . .
-RUN go build -o /medisynth-portal ./cmd/portal/main.go
+RUN go build -o /app/medisynth-portal ./cmd/portal/main.go
 
 # Use a minimal alpine image for the final stage
 FROM alpine:latest
 WORKDIR /app
-COPY --from=builder /medisynth-portal /app/medisynth-portal
+COPY --from=builder /app/medisynth-portal /app/medisynth-portal
 COPY templates/ /app/templates/
 COPY static/ /app/static/
 COPY app.yml app.prod.yml ./
