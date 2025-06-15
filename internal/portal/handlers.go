@@ -810,7 +810,9 @@ func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.renderAdminTemplate(w, r, "admin-users.html", "Users", map[string]interface{}{
-		"Users": users,
+		"Data": map[string]interface{}{
+			"Users": users,
+		},
 	})
 }
 
