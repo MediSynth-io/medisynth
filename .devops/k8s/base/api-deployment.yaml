@@ -12,6 +12,7 @@ spec:
     metadata:
       labels:
         app: medisynth-api
+        component: api
     spec:
       imagePullSecrets:
         - name: ghcr-login-secret

@@ -13,4 +13,6 @@ spec:
       port: 8081
       targetPort: http
   selector:
-    app: medisynth-api
+    app: medisynth-io
+    tier: backend
+    component: api

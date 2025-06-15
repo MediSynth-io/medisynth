@@ -7,7 +7,7 @@ resources:
   - api-deployment.yaml
   - portal-deployment.yaml
   - portal-service.yaml
-  - service.yaml
+  - api-service.yaml
   - sqlite-pvc.yaml
   - ingress.yaml
 
