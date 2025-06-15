@@ -133,6 +133,7 @@ func (p *Portal) Routes() http.Handler {
 	r.Get("/about", p.handleAboutRedirect)
 	r.Get("/login", p.handleLoginRedirect)
 	r.Get("/register", p.handleRegisterRedirect)
+	r.Get("/privacy", p.handlePrivacyPolicy)
 	r.Post("/login", p.handleLoginRedirect)
 	r.Post("/register", p.handleRegisterRedirect)
 

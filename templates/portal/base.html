@@ -57,6 +57,9 @@
                             <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                 Documentation
                             </a>
+                            <a href="/privacy" class="{{if eq .ActivePage "Privacy Policy"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Privacy Policy
+                            </a>
                         {{else}}
                             <!-- Public Navigation -->
                             <a href="https://medisynth.io/" class="{{if eq .ActivePage "Home"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
@@ -64,6 +67,9 @@
                             </a>
                             <a href="/about" class="text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                 About
+                            </a>
+                            <a href="/privacy" class="text-gray-600 hover:text-gray-900 hover:bg-gray-50 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Privacy Policy
                             </a>
                         {{end}}
                     </div>
@@ -136,6 +142,7 @@
                     <a href="/orders" class="{{if or (eq .ActivePage "My Orders") (eq .ActivePage "Order Details") (eq .ActivePage "Create Order")}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Orders</a>
                     <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">API Tokens</a>
                     <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Documentation</a>
+                    <a href="/privacy" class="{{if eq .ActivePage "Privacy Policy"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Privacy Policy</a>
                     <hr class="my-2">
                     <div class="px-3 py-2">
                         <div class="text-sm text-gray-500">Signed in as</div>
@@ -146,6 +153,7 @@
                     <!-- Mobile Public Navigation -->
                     <a href="https://medisynth.io/" class="{{if eq .ActivePage "Home"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Home</a>
                     <a href="/about" class="text-gray-600 block px-3 py-2 rounded-md text-base font-medium">About</a>
+                    <a href="/privacy" class="text-gray-600 block px-3 py-2 rounded-md text-base font-medium">Privacy Policy</a>
                     <hr class="my-2">
                     <a href="https://portal.medisynth.io/login" class="text-gray-600 block px-3 py-2 rounded-md text-base font-medium">Sign in</a>
                     <a href="https://portal.medisynth.io/register" class="bg-indigo-600 text-white block px-3 py-2 rounded-md text-base font-medium">Get started</a>

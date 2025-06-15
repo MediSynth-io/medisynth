@@ -1,0 +1,105 @@
+{{template "base" .}}
+
+{{define "title"}}Privacy Policy - MediSynth Portal{{end}}
+
+{{define "content"}}
+<div class="py-10">
+    <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h1 class="text-3xl font-bold leading-tight text-gray-900">Privacy Policy</h1>
+        <p class="mt-1 text-sm text-gray-500">Last updated: {{.Data.LastUpdated}}</p>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+        <div class="bg-white shadow-lg sm:rounded-lg p-8">
+            <div class="prose max-w-none">
+                <h2>1. Introduction</h2>
+                <p>
+                    Welcome to MediSynth. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform. 
+                    By accessing or using our service, you agree to this privacy policy.
+                </p>
+
+                <h2>2. Information We Collect</h2>
+                <h3>2.1 Personal Information</h3>
+                <ul>
+                    <li>Email address</li>
+                    <li>IP address</li>
+                    <li>Usage data and analytics</li>
+                    <li>Generated patient data</li>
+                    <li>Job history and parameters</li>
+                </ul>
+
+                <h3>2.2 Usage Information</h3>
+                <ul>
+                    <li>Login history and session data</li>
+                    <li>API usage patterns</li>
+                    <li>Generated data characteristics</li>
+                    <li>Platform interaction metrics</li>
+                </ul>
+
+                <h2>3. How We Use Your Information</h2>
+                <p>We use the collected information for various purposes:</p>
+                <ul>
+                    <li>To provide and maintain our service</li>
+                    <li>To notify you about changes to our service</li>
+                    <li>To provide customer support</li>
+                    <li>To gather analysis or valuable information to improve our service</li>
+                    <li>To monitor the usage of our service</li>
+                    <li>To detect, prevent and address technical issues</li>
+                </ul>
+
+                <h2>4. Data Retention</h2>
+                <p>We retain your information for the following periods:</p>
+                <ul>
+                    <li>Account information: Until account deletion or 2 years of inactivity</li>
+                    <li>Generated patient data: 30 days from generation</li>
+                    <li>Usage logs: 90 days</li>
+                    <li>API tokens: Until revoked or expired</li>
+                </ul>
+
+                <h2>5. Data Security</h2>
+                <p>
+                    We implement appropriate security measures to protect your personal information. 
+                    However, no method of transmission over the Internet or electronic storage is 100% secure.
+                </p>
+
+                <h2>6. Your Rights</h2>
+                <p>You have the right to:</p>
+                <ul>
+                    <li>Access your personal data</li>
+                    <li>Correct inaccurate data</li>
+                    <li>Request deletion of your data</li>
+                    <li>Object to our use of your data</li>
+                    <li>Request data portability</li>
+                </ul>
+
+                <h2>7. Third-Party Services</h2>
+                <p>
+                    We may employ third-party companies and individuals to facilitate our service, 
+                    provide service-related services, or assist us in analyzing how our service is used.
+                </p>
+
+                <h2>8. Changes to This Privacy Policy</h2>
+                <p>
+                    We may update our Privacy Policy from time to time. We will notify you of any changes 
+                    by posting the new Privacy Policy on this page and updating the "Last updated" date.
+                </p>
+
+                <h2>9. Contact Us</h2>
+                <p>
+                    If you have any questions about this Privacy Policy, please contact us at:
+                    <br>
+                    Email: privacy@medisynth.io
+                </p>
+
+                <div class="mt-8 p-4 bg-gray-50 rounded-lg">
+                    <h3 class="text-lg font-medium text-gray-900">Acceptance of Terms</h3>
+                    <p class="mt-2 text-sm text-gray-600">
+                        By using our platform, you acknowledge that you have read and understood this Privacy Policy 
+                        and agree to the collection and use of information in accordance with this policy.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+{{end}} 

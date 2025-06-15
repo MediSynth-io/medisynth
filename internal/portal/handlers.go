@@ -1077,3 +1077,10 @@ func (p *Portal) handleJobOutputs(w http.ResponseWriter, r *http.Request) {
 		"Files": files,
 	})
 }
+
+func (p *Portal) handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"LastUpdated": time.Now().Format("January 2, 2006"),
+	}
+	p.renderTemplate(w, r, "privacy-policy.html", "Privacy Policy", data)
+}
