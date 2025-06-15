@@ -30,6 +30,40 @@ func (p *Portal) handleRegister(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (p *Portal) handleLoginRedirect(w http.ResponseWriter, r *http.Request) {
+	// Check if we're on the main domain and need to redirect to portal
+	if !strings.Contains(r.Host, "portal.") {
+		log.Printf("[REDIRECT] Redirecting login from %s to portal.medisynth.io", r.Host)
+		redirectURL := "https://" + p.config.DomainPortal + "/login"
+		http.Redirect(w, r, redirectURL, http.StatusPermanentRedirect)
+		return
+	}
+
+	// We're on portal domain, handle normally
+	if r.Method == "GET" {
+		p.handleLogin(w, r)
+	} else {
+		p.handleLoginPost(w, r)
+	}
+}
+
+func (p *Portal) handleRegisterRedirect(w http.ResponseWriter, r *http.Request) {
+	// Check if we're on the main domain and need to redirect to portal
+	if !strings.Contains(r.Host, "portal.") {
+		log.Printf("[REDIRECT] Redirecting register from %s to portal.medisynth.io", r.Host)
+		redirectURL := "https://" + p.config.DomainPortal + "/register"
+		http.Redirect(w, r, redirectURL, http.StatusPermanentRedirect)
+		return
+	}
+
+	// We're on portal domain, handle normally
+	if r.Method == "GET" {
+		p.handleRegister(w, r)
+	} else {
+		p.handleRegisterPost(w, r)
+	}
+}
+
 func (p *Portal) handleDocumentation(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "documentation.html", "Documentation", map[string]interface{}{})
 }

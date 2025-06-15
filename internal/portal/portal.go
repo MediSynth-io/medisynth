@@ -80,11 +80,11 @@ func (p *Portal) Routes() http.Handler {
 			p.handleLanding(w, r)
 		}
 	})
-	r.Get("/login", p.handleLogin)
-	r.Get("/register", p.handleRegister)
+	r.Get("/login", p.handleLoginRedirect)
+	r.Get("/register", p.handleRegisterRedirect)
 	r.Get("/documentation", p.handleDocumentation)
-	r.Post("/login", p.handleLoginPost)
-	r.Post("/register", p.handleRegisterPost)
+	r.Post("/login", p.handleLoginRedirect)
+	r.Post("/register", p.handleRegisterRedirect)
 
 	// Favicon
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
