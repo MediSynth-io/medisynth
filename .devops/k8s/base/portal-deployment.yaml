@@ -33,6 +33,8 @@ spec:
                 name: medisynth-s3-credentials
             - secretRef:
                 name: medisynth-postgres-app-credentials
+            - secretRef:
+                name: medisynth-admin-config
           resources:
             requests:
               memory: "128Mi"

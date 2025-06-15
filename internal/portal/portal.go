@@ -13,6 +13,7 @@ import (
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -120,6 +121,16 @@ func (p *Portal) Routes() http.Handler {
 		})
 	})
 
+	// Admin routes (TODO: implement handlers)
+	// r.Group(func(r chi.Router) {
+	// 	r.Use(p.requireAuth)
+	// 	r.Use(p.requireAdmin)
+	// 	r.Get("/admin", p.handleAdminDashboard)
+	// 	r.Get("/admin/users", p.handleAdminUsers)
+	// 	r.Get("/admin/bitcoin", p.handleBitcoinPayments)
+	// 	r.Post("/admin/bitcoin/generate-qr", p.handleGeneratePaymentQR)
+	// })
+
 	// NotFound handler
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		p.renderTemplate(w, r, "404.html", "Not Found", map[string]interface{}{
@@ -174,5 +185,32 @@ func (p *Portal) requireAuth(next http.Handler) http.Handler {
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, "userID", userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (p *Portal) requireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := r.Context().Value("userID").(string)
+		if !ok {
+			log.Printf("[ADMIN] No userID in context")
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		user, err := database.GetUserByID(userID)
+		if err != nil {
+			log.Printf("[ADMIN] Failed to get user %s: %v", userID, err)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		if !p.config.IsAdmin(user.Email) {
+			log.Printf("[ADMIN] User %s (%s) is not in admin list", userID, user.Email)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		log.Printf("[ADMIN] Admin access granted for user: %s (%s)", userID, user.Email)
+		next.ServeHTTP(w, r)
 	})
 }

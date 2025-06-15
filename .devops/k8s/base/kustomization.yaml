@@ -11,7 +11,7 @@ resources:
   - api-service.yaml
   - sqlite-pvc.yaml
   - ingress.yaml
-
+  - admin-secret.yaml
 secretGenerator:
 - name: medisynth-secrets
   envs:

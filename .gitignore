@@ -5,6 +5,10 @@ cmd/api/medisynth-api
 *postgres*credentials*.yaml
 *postgres*secret*.yaml
 
+# Admin configuration secrets
+.devops/k8s/base/admin-secret.yaml
+*admin*secret*.yaml
+
 # Environment files with secrets
 .env
 .env.local

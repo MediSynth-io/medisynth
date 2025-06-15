@@ -541,6 +541,7 @@ func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmplName
 			// Don't fail the template rendering, just log the warning
 		} else {
 			templateData["User"] = user
+			templateData["IsAdmin"] = p.config.IsAdmin(user.Email)
 		}
 	}
 

@@ -180,6 +180,7 @@ func initSchema(db *sql.DB, dbType string) error {
 				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 				email VARCHAR(255) UNIQUE NOT NULL,
 				password VARCHAR(255) NOT NULL,
+				is_admin BOOLEAN NOT NULL DEFAULT FALSE,
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 				updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 			)`,
@@ -228,6 +229,7 @@ func initSchema(db *sql.DB, dbType string) error {
 				id TEXT PRIMARY KEY,
 				email TEXT UNIQUE NOT NULL,
 				password TEXT NOT NULL,
+				is_admin BOOLEAN NOT NULL DEFAULT 0,
 				created_at DATETIME NOT NULL,
 				updated_at DATETIME NOT NULL
 			)`,
@@ -372,14 +374,14 @@ func GetUserByEmail(email string) (*models.User, error) {
 
 	if dbType == "postgres" {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, created_at, updated_at FROM users WHERE email = $1",
+			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE email = $1",
 			email,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
 	} else {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, created_at, updated_at FROM users WHERE email = ?",
+			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE email = ?",
 			email,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
 	}
 
 	if err != nil {
@@ -395,20 +397,74 @@ func GetUserByID(id string) (*models.User, error) {
 
 	if dbType == "postgres" {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, created_at, updated_at FROM users WHERE id = $1",
+			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE id = $1",
 			id,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
 	} else {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, created_at, updated_at FROM users WHERE id = ?",
+			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE id = ?",
 			id,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
 	}
 
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+// MakeUserAdmin makes a user an admin
+func MakeUserAdmin(userID string) error {
+	var query string
+	if dbType == "postgres" {
+		query = "UPDATE users SET is_admin = true WHERE id = $1"
+	} else {
+		query = "UPDATE users SET is_admin = 1 WHERE id = ?"
+	}
+
+	result, err := dbConn.Exec(query, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
+
+// GetAllUsers retrieves all users (admin only)
+func GetAllUsers() ([]*models.User, error) {
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT id, email, password, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
+	} else {
+		query = "SELECT id, email, password, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
+	}
+
+	rows, err := dbConn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		user := &models.User{}
+		err := rows.Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
 }
 
 // CreateToken creates a new API token

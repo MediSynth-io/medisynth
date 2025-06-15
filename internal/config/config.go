@@ -43,6 +43,9 @@ type Config struct {
 	S3AccessKeyID     string `mapstructure:"S3_ACCESS_KEY_ID"`     // DigitalOcean Spaces Key
 	S3SecretAccessKey string `mapstructure:"S3_SECRET_ACCESS_KEY"` // DigitalOcean Spaces Secret
 	S3UseSSL          bool   `mapstructure:"S3_USE_SSL"`
+
+	// Admin configuration
+	AdminEmails []string `mapstructure:"ADMIN_EMAILS"` // Comma-separated list of admin emails
 }
 
 // Database returns a database config struct for backward compatibility
@@ -113,6 +116,7 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("S3_ACCESS_KEY_ID", "")
 	v.SetDefault("S3_SECRET_ACCESS_KEY", "")
 	v.SetDefault("S3_USE_SSL", true)
+	v.SetDefault("ADMIN_EMAILS", "")
 
 	// Explicitly bind environment variables
 	envVars := []string{
@@ -122,6 +126,7 @@ func LoadConfig() (*Config, error) {
 		"DB_MAX_CONNECTIONS", "DB_MAX_IDLE_CONNECTIONS", "DB_CONNECTION_MAX_LIFETIME",
 		"DOMAIN_PORTAL", "DOMAIN_API", "DOMAIN_SECURE",
 		"S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_USE_SSL",
+		"ADMIN_EMAILS",
 	}
 
 	for _, envVar := range envVars {
@@ -135,6 +140,26 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	log.Printf("Configuration loaded successfully")
+	// Parse comma-separated admin emails
+	adminEmailsStr := v.GetString("ADMIN_EMAILS")
+	if adminEmailsStr != "" {
+		cfg.AdminEmails = strings.Split(adminEmailsStr, ",")
+		// Trim whitespace from each email
+		for i, email := range cfg.AdminEmails {
+			cfg.AdminEmails[i] = strings.TrimSpace(email)
+		}
+	}
+
+	log.Printf("Configuration loaded successfully with %d admin emails", len(cfg.AdminEmails))
 	return &cfg, nil
+}
+
+// IsAdmin checks if the given email is in the admin list
+func (c *Config) IsAdmin(email string) bool {
+	for _, adminEmail := range c.AdminEmails {
+		if strings.EqualFold(adminEmail, email) {
+			return true
+		}
+	}
+	return false
 }
