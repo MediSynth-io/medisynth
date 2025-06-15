@@ -129,14 +129,22 @@ func (p *Portal) Routes() http.Handler {
 
 func (p *Portal) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[AUTH] Checking authentication for %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+
 		cookie, err := r.Cookie("session")
 		if err != nil || cookie.Value == "" {
+			log.Printf("[AUTH] No session cookie found: %v", err)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
+
+		log.Printf("[AUTH] Found session cookie, length: %d", len(cookie.Value))
+
 		session, err := auth.ValidateSession(cookie.Value)
 		if err != nil {
+			log.Printf("[AUTH] Session validation failed: %v", err)
 			if err == auth.ErrSessionExpired {
+				log.Printf("[AUTH] Session expired, clearing cookie")
 				// Clear expired session cookie
 				http.SetCookie(w, &http.Cookie{
 					Name:     "session",
@@ -152,6 +160,8 @@ func (p *Portal) requireAuth(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
+
+		log.Printf("[AUTH] Session validation successful for user: %s", session.UserID)
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, "userID", session.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))

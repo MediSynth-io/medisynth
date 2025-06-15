@@ -38,8 +38,13 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
+	log.Printf("[LOGIN] Attempting login for email: %s", email)
+	log.Printf("[LOGIN] Password length: %d characters", len(password))
+	log.Printf("[LOGIN] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
+
 	user, err := auth.ValidateUser(email, password)
 	if err != nil {
+		log.Printf("[LOGIN] Authentication failed for %s: %v", email, err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{
 			"Error": "Invalid email or password",
 			"Email": email,
@@ -47,10 +52,12 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[LOGIN] Authentication successful for user: %s (ID: %s)", email, user.ID)
+
 	// Create session
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		log.Printf("Error creating session: %v", err)
+		log.Printf("[LOGIN] Error creating session for %s: %v", email, err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{
 			"Error": "Failed to create session. Please try again.",
 			"Email": email,
@@ -58,8 +65,10 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[LOGIN] Session created successfully for %s, token length: %d", email, len(token))
+
 	// Set session cookie
-	http.SetCookie(w, &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
@@ -68,7 +77,11 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Secure:   p.config.DomainSecure,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
-	})
+	}
+	http.SetCookie(w, cookie)
+
+	log.Printf("[LOGIN] Cookie set for %s - Domain: %s, Secure: %v", email, p.config.DomainPortal, p.config.DomainSecure)
+	log.Printf("[LOGIN] Redirecting %s to /dashboard", email)
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
@@ -78,52 +91,67 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
+	log.Printf("[REGISTER] Registration attempt for email: %s", email)
+	log.Printf("[REGISTER] Password length: %d, Confirm length: %d", len(password), len(confirmPassword))
+	log.Printf("[REGISTER] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
+	log.Printf("[REGISTER] Content-Type: %s", r.Header.Get("Content-Type"))
+
 	data := map[string]interface{}{
 		"Email":                email,
 		"PasswordRequirements": auth.GetPasswordRequirements(),
 	}
 
 	if !auth.ValidateEmail(email) {
+		log.Printf("[REGISTER] Email validation failed for: %s", email)
 		data["Error"] = "Please enter a valid email address"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	if password != confirmPassword {
+		log.Printf("[REGISTER] Password confirmation mismatch for: %s", email)
 		data["Error"] = "Passwords do not match"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	if !auth.ValidatePassword(password) {
+		log.Printf("[REGISTER] Password validation failed for: %s", email)
 		data["Error"] = "Password does not meet the requirements"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
+	log.Printf("[REGISTER] All validations passed for: %s", email)
+
 	user, err := auth.RegisterUser(email, password)
 	if err != nil {
+		log.Printf("[REGISTER] Failed to register user %s: %v", email, err)
 		if strings.Contains(err.Error(), "UNIQUE constraint") {
 			data["Error"] = "This email is already registered"
 		} else {
 			data["Error"] = "Registration failed. Please try again."
-			log.Printf("Registration error: %v", err)
+			log.Printf("[REGISTER] Registration error: %v", err)
 		}
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
+	log.Printf("[REGISTER] User successfully created: %s (ID: %s)", email, user.ID)
+
 	// Create session
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		log.Printf("Error creating session: %v", err)
+		log.Printf("[REGISTER] Error creating session for %s: %v", email, err)
 		data["Error"] = "Registration successful but failed to log in. Please try logging in."
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
+	log.Printf("[REGISTER] Session created successfully for %s, token length: %d", email, len(token))
+
 	// Set session cookie
-	http.SetCookie(w, &http.Cookie{
+	cookie := &http.Cookie{
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
@@ -132,7 +160,11 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		Secure:   p.config.DomainSecure,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
-	})
+	}
+	http.SetCookie(w, cookie)
+
+	log.Printf("[REGISTER] Cookie set - Domain: %s, Secure: %v, SameSite: %v", p.config.DomainPortal, p.config.DomainSecure, http.SameSiteStrictMode)
+	log.Printf("[REGISTER] Redirecting %s to /dashboard", email)
 
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
@@ -140,13 +172,18 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(string)
 
+	log.Printf("[DASHBOARD] Rendering dashboard for user: %s", userID)
+	log.Printf("[DASHBOARD] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
+
 	// Get API tokens count as a simple metric
 	tokens, err := database.GetUserTokens(userID)
 	if err != nil {
-		log.Printf("Error getting tokens: %v", err)
+		log.Printf("[DASHBOARD] Error getting tokens for user %s: %v", userID, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
+
+	log.Printf("[DASHBOARD] Found %d tokens for user %s", len(tokens), userID)
 
 	data := struct {
 		APIRequests      int    `json:"apiRequests"`
