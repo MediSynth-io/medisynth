@@ -3,8 +3,10 @@ package s3
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/models"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -44,4 +46,44 @@ func NewClient(cfg *config.Config) (*Client, error) {
 		Client:     client,
 		BucketName: cfg.S3Bucket,
 	}, nil
+}
+
+func (c *Client) ListFiles(ctx context.Context, prefix string) ([]models.JobFile, error) {
+	output, err := c.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: &c.BucketName,
+		Prefix: &prefix,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	presignClient := s3.NewPresignClient(c.Client)
+	var files []models.JobFile
+
+	for _, object := range output.Contents {
+		req, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+			Bucket: &c.BucketName,
+			Key:    object.Key,
+		}, func(opts *s3.PresignOptions) {
+			opts.Expires = 24 * time.Hour
+		})
+		if err != nil {
+			log.Printf("Failed to generate presigned URL for key %s: %v", *object.Key, err)
+			continue // Or handle error differently
+		}
+
+		var size int64
+		if object.Size != nil {
+			size = *object.Size
+		}
+
+		files = append(files, models.JobFile{
+			S3Key:    *object.Key,
+			Filename: *object.Key, // TODO: improve this
+			Size:     size,
+			URL:      req.URL,
+		})
+	}
+
+	return files, nil
 }

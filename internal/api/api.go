@@ -9,7 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"bytes"
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"sync"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
@@ -17,6 +21,7 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/models"
 	"github.com/MediSynth-io/medisynth/internal/s3"
+	awsSDKs3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -121,6 +126,7 @@ func (api *Api) setupRoutes() {
 		r.Post("/generate-patients", api.RunSyntheaGeneration)
 		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
 		r.Get("/jobs", api.ListJobsHandler)
+		r.Get("/jobs/{jobID}/files", api.ListJobFilesHandler)
 	})
 
 	// Swagger UI
@@ -248,7 +254,7 @@ func (api *Api) RunSyntheaGeneration(w http.ResponseWriter, r *http.Request) {
 }
 
 func (api *Api) executeSyntheaJob(job *models.Job) {
-	_, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	runningJobsMutex.Lock()
 	runningJobs[job.ID] = cancel
 	runningJobsMutex.Unlock()
@@ -263,21 +269,115 @@ func (api *Api) executeSyntheaJob(job *models.Job) {
 	log.Printf("Starting Synthea generation for job %s", job.ID)
 	database.UpdateJobStatus(job.ID, models.JobStatusRunning, nil, nil, nil, nil)
 
-	time.Sleep(10 * time.Second) // Simulate work
+	// --- Synthea Execution ---
+	outputDir, err := os.MkdirTemp("", "synthea-output-"+job.ID)
+	if err != nil {
+		log.Printf("ERROR: Failed to create temp dir for job %s: %v", job.ID, err)
+		errMsg := "failed to create temp dir"
+		database.UpdateJobStatus(job.ID, models.JobStatusFailed, &errMsg, nil, nil, nil)
+		return
+	}
+	defer os.RemoveAll(outputDir)
 
+	log.Printf("Created temp directory for Synthea output: %s", outputDir)
+
+	syntheaArgs, err := job.GetSyntheaArgs()
+	if err != nil {
+		log.Printf("ERROR: Failed to build Synthea args for job %s: %v", job.ID, err)
+		errMsg := "failed to build synthea args"
+		database.UpdateJobStatus(job.ID, models.JobStatusFailed, &errMsg, nil, nil, nil)
+		return
+	}
+
+	// Base synthea command
+	cmdArgs := []string{"-p", syntheaArgs.Population}
+
+	// Add other parameters from SyntheaParams as needed
+	if syntheaArgs.Gender != "" {
+		cmdArgs = append(cmdArgs, "-g", syntheaArgs.Gender)
+	}
+	if syntheaArgs.AgeRange != "" {
+		cmdArgs = append(cmdArgs, "-a", syntheaArgs.AgeRange)
+	}
+	if syntheaArgs.City != "" {
+		cmdArgs = append(cmdArgs, "--city", syntheaArgs.City)
+	}
+
+	cmdArgs = append(cmdArgs, "--exporter.base_directory", outputDir)
+
+	log.Printf("Running Synthea for job %s with args: %v", job.ID, cmdArgs)
+
+	cmd := exec.CommandContext(ctx, "synthea", cmdArgs...)
+	var out, errOut bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &errOut
+
+	err = cmd.Run()
+	if err != nil {
+		errMsg := fmt.Sprintf("Synthea execution failed: %s", errOut.String())
+		log.Printf("ERROR: Job %s failed: %s", job.ID, errMsg)
+		log.Printf("Synthea stdout: %s", out.String())
+		database.UpdateJobStatus(job.ID, models.JobStatusFailed, &errMsg, nil, nil, nil)
+		return
+	}
+
+	log.Printf("Synthea execution successful for job %s.", job.ID)
+
+	// --- S3 Upload ---
 	s3KeyPrefix := fmt.Sprintf("synthea_output/%s/", job.JobID)
-	log.Printf("Simulating S3 upload for job %s to path %s", job.ID, s3KeyPrefix)
+	log.Printf("Uploading Synthea output for job %s to S3 path %s", job.ID, s3KeyPrefix)
+
+	err = api.uploadDirectoryToS3(ctx, outputDir, s3KeyPrefix)
+	if err != nil {
+		errMsg := fmt.Sprintf("S3 upload failed: %v", err)
+		log.Printf("ERROR: Job %s failed: %v", job.ID, errMsg)
+		database.UpdateJobStatus(job.ID, models.JobStatusFailed, &errMsg, nil, nil, nil)
+		return
+	}
 
 	population, _ := job.Parameters["population"].(float64)
 	patientCount := int(population)
 
-	err := database.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil, &s3KeyPrefix, nil, &patientCount)
+	err = database.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil, &s3KeyPrefix, nil, &patientCount)
 	if err != nil {
 		log.Printf("ERROR: Failed to update job %s to completed: %v", job.ID, err)
 		return
 	}
 
 	log.Printf("Job %s completed successfully", job.ID)
+}
+
+func (api *Api) uploadDirectoryToS3(ctx context.Context, dir, s3KeyPrefix string) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(dir, path)
+		if err != nil {
+			return err
+		}
+
+		s3Key := filepath.ToSlash(filepath.Join(s3KeyPrefix, relPath))
+
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		log.Printf("Uploading %s to s3://%s/%s", path, api.S3Client.BucketName, s3Key)
+
+		_, err = api.S3Client.PutObject(ctx, &awsSDKs3.PutObjectInput{
+			Bucket: &api.S3Client.BucketName,
+			Key:    &s3Key,
+			Body:   file,
+		})
+		return err
+	})
 }
 
 func (api *Api) GetGenerationStatus(w http.ResponseWriter, r *http.Request) {
@@ -314,4 +414,39 @@ func (api *Api) ListJobsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(jobs)
+}
+
+func (api *Api) ListJobFilesHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in token", http.StatusUnauthorized)
+		return
+	}
+
+	jobID := chi.URLParam(r, "jobID")
+	job, err := database.GetJobByID(jobID)
+	if err != nil {
+		http.Error(w, "Job not found", http.StatusNotFound)
+		return
+	}
+
+	if job.UserID != userID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	if job.OutputPath == nil || *job.OutputPath == "" {
+		http.Error(w, "Job has no output path", http.StatusNotFound)
+		return
+	}
+
+	files, err := api.S3Client.ListFiles(r.Context(), *job.OutputPath)
+	if err != nil {
+		log.Printf("ERROR: Failed to list files for job %s: %v", jobID, err)
+		http.Error(w, "Failed to list job files", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(files)
 }

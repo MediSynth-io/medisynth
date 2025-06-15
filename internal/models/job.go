@@ -56,6 +56,13 @@ type SyntheaParams struct {
 	Seed          *int64   `json:"seed,omitempty"`
 }
 
+type SyntheaCmdArgs struct {
+	Population string
+	Gender     string
+	AgeRange   string
+	City       string
+}
+
 // GetOutputFormat returns the output format, defaulting to "fhir"
 func (p *SyntheaParams) GetOutputFormat() string {
 	if p.OutputFormat != nil {
@@ -98,6 +105,38 @@ func (p *SyntheaParams) ToMap() map[string]interface{} {
 		m["seed"] = *p.Seed
 	}
 	return m
+}
+
+// GetSyntheaArgs returns the Synthea command-line arguments for the job
+func (j *Job) GetSyntheaArgs() (*SyntheaCmdArgs, error) {
+	args := &SyntheaCmdArgs{}
+	if err := j.UnmarshalParameters(); err != nil {
+		return nil, fmt.Errorf("could not unmarshal job parameters: %w", err)
+	}
+
+	if pop, ok := j.Parameters["population"].(float64); ok {
+		args.Population = fmt.Sprintf("%d", int(pop))
+	} else {
+		return nil, fmt.Errorf("population not found in job parameters")
+	}
+
+	if gender, ok := j.Parameters["gender"].(string); ok {
+		args.Gender = gender
+	}
+
+	if city, ok := j.Parameters["city"].(string); ok {
+		args.City = city
+	}
+
+	var ageMin, ageMax float64
+	var ageMinOk, ageMaxOk bool
+	if ageMin, ageMinOk = j.Parameters["ageMin"].(float64); ageMinOk {
+		if ageMax, ageMaxOk = j.Parameters["ageMax"].(float64); ageMaxOk {
+			args.AgeRange = fmt.Sprintf("%d-%d", int(ageMin), int(ageMax))
+		}
+	}
+
+	return args, nil
 }
 
 // MarshalParameters converts the Parameters map to JSON for database storage
