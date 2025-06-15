@@ -11,45 +11,160 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 </head>
-<body class="h-full flex flex-col">
-    <header class="bg-white shadow-sm">
-        <nav class="container mx-auto px-4 lg:px-6 py-3.5">
-            <div class="flex flex-wrap justify-between items-center mx-auto max-w-screen-xl">
-                <a href="/" class="flex items-center">
-                    <img src="/static/favicon.ico" class="mr-3 h-6 sm:h-9" alt="MediSynth Logo" />
-                    <span class="self-center text-xl font-semibold whitespace-nowrap">MediSynth</span>
-                </a>
-                <div class="flex items-center lg:order-2">
-                    {{if .User}}
-                        <a href="/logout" class="text-gray-800 hover:bg-gray-50 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 lg:px-5 py-2 lg:py-2.5 mr-2 focus:outline-none">Logout</a>
-                    {{else}}
-                        <a href="https://portal.medisynth.io/login" class="text-gray-800 hover:bg-gray-50 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-4 lg:px-5 py-2 lg:py-2.5 mr-2 focus:outline-none">Log in</a>
-                        <a href="https://portal.medisynth.io/register" class="text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-300 font-medium rounded-lg text-sm px-4 lg:px-5 py-2 lg:py-2.5 mr-2 focus:outline-none">Get started</a>
-                    {{end}}
+<body class="h-full flex flex-col" x-data="{ mobileMenuOpen: false }">
+    <!-- Navigation Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo and Brand -->
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center">
+                        <img src="/static/favicon.ico" class="h-8 w-8 mr-3" alt="MediSynth Logo" />
+                        <span class="text-xl font-bold text-gray-900">MediSynth</span>
+                    </a>
                 </div>
-                <div class="hidden justify-between items-center w-full lg:flex lg:w-auto lg:order-1" id="mobile-menu-2">
-                    <ul class="flex flex-col mt-4 font-medium lg:flex-row lg:space-x-8 lg:mt-0">
+
+                <!-- Desktop Navigation -->
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
                         {{if .User}}
-                            <li><a href="/dashboard" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'Dashboard' }">Dashboard</a></li>
-                            <li><a href="/tokens" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'API Tokens' }">API Tokens</a></li>
-                            <li><a href="/jobs" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'Generation History' }">Jobs</a></li>
+                            <!-- Logged In Navigation -->
+                            <a href="/dashboard" class="{{if eq .ActivePage "Dashboard"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Dashboard
+                            </a>
+                            <a href="/jobs" class="{{if eq .ActivePage "Generation History"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Jobs
+                            </a>
+                            <a href="/jobs/new" class="{{if eq .ActivePage "New Job"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Generate Data
+                            </a>
+                            <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                API Tokens
+                            </a>
                         {{else}}
-                             <li><a href="/" class="block py-2 pr-4 pl-3 rounded lg:bg-transparent {{if eq .ActivePage "Home"}}text-indigo-700{{else}}text-gray-700{{end}} lg:p-0" aria-current="page">Home</a></li>
+                            <!-- Public Navigation -->
+                            <a href="/" class="{{if eq .ActivePage "Home"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Home
+                            </a>
                         {{end}}
-                        <li><a href="/documentation" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'Documentation' }">Documentation</a></li>
-                    </ul>
+                        <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                            Documentation
+                        </a>
+                    </div>
+                </div>
+
+                <!-- User Menu / Auth Buttons -->
+                <div class="hidden md:block">
+                    <div class="ml-4 flex items-center md:ml-6">
+                        {{if .User}}
+                            <!-- User Dropdown -->
+                            <div class="relative" x-data="{ userMenuOpen: false }">
+                                <button @click="userMenuOpen = !userMenuOpen" class="flex items-center text-sm rounded-full text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                    <div class="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                        <span class="text-sm font-medium text-indigo-700">{{printf "%.1s" .User.Email | upper}}</span>
+                                    </div>
+                                    <span class="ml-2 text-sm font-medium">{{.User.Email}}</span>
+                                    <svg class="ml-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7 7"></path>
+                                    </svg>
+                                </button>
+                                <div x-show="userMenuOpen" @click.away="userMenuOpen = false" x-transition class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5">
+                                    <div class="py-1">
+                                        <a href="/dashboard" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Profile</a>
+                                        <a href="/tokens" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Settings</a>
+                                        <hr class="my-1">
+                                        <a href="/logout" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">Sign out</a>
+                                    </div>
+                                </div>
+                            </div>
+                        {{else}}
+                            <!-- Auth Buttons -->
+                            <div class="flex items-center space-x-4">
+                                <a href="/login" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                    Sign in
+                                </a>
+                                <a href="/register" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                    Get started
+                                </a>
+                            </div>
+                        {{end}}
+                    </div>
+                </div>
+
+                <!-- Mobile menu button -->
+                <div class="md:hidden">
+                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path x-show="!mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            <path x-show="mobileMenuOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </nav>
+
+        <!-- Mobile Navigation Menu -->
+        <div x-show="mobileMenuOpen" x-transition class="md:hidden border-t border-gray-200">
+            <div class="px-2 pt-2 pb-3 space-y-1 bg-white">
+                {{if .User}}
+                    <!-- Mobile Logged In Navigation -->
+                    <a href="/dashboard" class="{{if eq .ActivePage "Dashboard"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Dashboard</a>
+                    <a href="/jobs" class="{{if eq .ActivePage "Generation History"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Jobs</a>
+                    <a href="/jobs/new" class="{{if eq .ActivePage "New Job"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Generate Data</a>
+                    <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">API Tokens</a>
+                    <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Documentation</a>
+                    <hr class="my-2">
+                    <div class="px-3 py-2">
+                        <div class="text-sm text-gray-500">Signed in as</div>
+                        <div class="text-sm font-medium text-gray-900">{{.User.Email}}</div>
+                    </div>
+                    <a href="/logout" class="text-gray-600 block px-3 py-2 rounded-md text-base font-medium">Sign out</a>
+                {{else}}
+                    <!-- Mobile Public Navigation -->
+                    <a href="/" class="{{if eq .ActivePage "Home"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Home</a>
+                    <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Documentation</a>
+                    <hr class="my-2">
+                    <a href="/login" class="text-gray-600 block px-3 py-2 rounded-md text-base font-medium">Sign in</a>
+                    <a href="/register" class="bg-indigo-600 text-white block px-3 py-2 rounded-md text-base font-medium">Get started</a>
+                {{end}}
+            </div>
+        </div>
     </header>
 
+    <!-- Breadcrumbs (for logged in users on specific pages) -->
+    {{if and .User (ne .ActivePage "Dashboard") (ne .ActivePage "Home")}}
+    <div class="bg-gray-50 border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center space-x-2 py-3 text-sm">
+                <a href="/dashboard" class="text-gray-500 hover:text-gray-700">Dashboard</a>
+                <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+                <span class="text-gray-900 font-medium">{{.ActivePage}}</span>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Main Content -->
     <main class="flex-grow">
         {{block "content" .}}{{end}}
     </main>
 
-    <footer class="mt-auto py-3 bg-gray-100">
-        <div class="container mx-auto">
-            <p class="text-center text-gray-500 text-sm">&copy; 2025 MediSynth. All rights reserved.</p>
+    <!-- Footer -->
+    <footer class="mt-auto bg-white border-t border-gray-200">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center space-x-6 mb-4 md:mb-0">
+                    <a href="/documentation" class="text-gray-500 hover:text-gray-700 text-sm">Documentation</a>
+                    <a href="#" class="text-gray-500 hover:text-gray-700 text-sm">API Reference</a>
+                    <a href="#" class="text-gray-500 hover:text-gray-700 text-sm">Support</a>
+                    <a href="#" class="text-gray-500 hover:text-gray-700 text-sm">Status</a>
+                </div>
+                <div class="text-gray-500 text-sm">
+                    &copy; 2025 MediSynth. All rights reserved.
+                </div>
+            </div>
         </div>
     </footer>
 </body>
