@@ -260,25 +260,25 @@ func (p *Portal) requireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := r.Context().Value("userID").(string)
 		if !ok {
-			log.Printf("[ADMIN] No userID in context")
+			logRequest(r, "ADMIN_AUTH", "Forbidden: No user ID in context")
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
 		user, err := database.GetUserByID(userID)
 		if err != nil {
-			log.Printf("[ADMIN] Failed to get user %s: %v", userID, err)
+			logRequest(r, "ADMIN_AUTH", "Forbidden: User not found with ID:", userID, "Error:", err)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
 		if !p.config.IsAdmin(user.Email) {
-			log.Printf("[ADMIN] User %s (%s) is not in admin list", userID, user.Email)
+			logRequest(r, "ADMIN_AUTH", "Forbidden: User is not an admin:", user.Email)
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 
-		log.Printf("[ADMIN] Admin access granted for user: %s (%s)", userID, user.Email)
+		logRequest(r, "ADMIN_AUTH", "Admin access granted")
 		next.ServeHTTP(w, r)
 	})
 }
