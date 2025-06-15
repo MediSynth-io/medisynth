@@ -117,7 +117,7 @@ func (api *Api) setupRoutes() {
 
 	// Protected API routes
 	r.Group(func(r chi.Router) {
-		r.Use(api.TokenAuthMiddleware)
+		r.Use(api.UnifiedAuthMiddleware)
 		r.Post("/tokens", api.CreateTokenHandler)
 		r.Get("/tokens", api.ListTokensHandler)
 		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
@@ -521,7 +521,7 @@ func (api *Api) DeleteTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 // --- Middleware ---
 
-func (api *Api) TokenAuthMiddleware(next http.Handler) http.Handler {
+func (api *Api) UnifiedAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {

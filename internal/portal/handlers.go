@@ -177,24 +177,7 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(string)
-	tokens, err := database.GetUserTokens(userID)
-	if err != nil {
-		log.Printf("Error getting tokens: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	// Check for a token value in the query params (for display after creation)
-	tokenValue := r.URL.Query().Get("new_token")
-	data := map[string]interface{}{
-		"Data": map[string]interface{}{
-			"Tokens": tokens,
-		},
-		"NewToken": tokenValue,
-	}
-
-	p.renderTemplate(w, r, "tokens.html", "API Tokens", data)
+	p.renderTemplate(w, r, "tokens.html", "API Tokens", nil)
 }
 
 func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
