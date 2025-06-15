@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVICE_TYPE=api
+      - MEDISYNTH_ENV=${MEDISYNTH_ENV:-dev}
+      - MEDISYNTH_API_PORT=8081
+      - MEDISYNTH_DB_TYPE=sqlite
+      - MEDISYNTH_DB_PATH=/app/data/medisynth.db
+      - MEDISYNTH_JWT_SECRET=${MEDISYNTH_JWT_SECRET:-dev_secret_key}
+      - MEDISYNTH_SESSION_SECRET=${MEDISYNTH_SESSION_SECRET:-dev_session_secret}
+    volumes:
+      - ./data:/app/data
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+      - ./app.yml:/app/app.yml:ro
+      - ./app.prod.yml:/app/app.prod.yml:ro
+    networks:
+      medisynth:
+        aliases:
+          - api.local
+          - api.medisynth.io
+    dns_search:
+      - medisynth
+    extra_hosts:
+      - "portal.local:host-gateway"
+      - "api.local:host-gateway"
+
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8081"
+    environment:
+      - SERVICE_TYPE=portal
+      - MEDISYNTH_ENV=${MEDISYNTH_ENV:-dev}
+      - MEDISYNTH_API_PORT=8081
+      - MEDISYNTH_DB_TYPE=sqlite
+      - MEDISYNTH_DB_PATH=/app/data/medisynth.db
+      - MEDISYNTH_JWT_SECRET=${MEDISYNTH_JWT_SECRET:-dev_secret_key}
+      - MEDISYNTH_SESSION_SECRET=${MEDISYNTH_SESSION_SECRET:-dev_session_secret}
+    volumes:
+      - ./data:/app/data
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+      - ./app.yml:/app/app.yml:ro
+      - ./app.prod.yml:/app/app.prod.yml:ro
+    networks:
+      medisynth:
+        aliases:
+          - portal.local
+          - portal.medisynth.io
+    dns_search:
+      - medisynth
+    extra_hosts:
+      - "portal.local:host-gateway"
+      - "api.local:host-gateway"
+
+networks:
+  medisynth:
+    driver: bridge 

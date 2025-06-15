@@ -4,63 +4,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{block "title" .}}MediSynth Portal{{end}}</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="/static/css/tailwind.min.css" rel="stylesheet">
+    <style>
+        .nav-link {
+            @apply px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-200;
+        }
+        .nav-link-active {
+            @apply px-3 py-2 rounded-md text-sm font-medium text-blue-700 bg-blue-100;
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    <nav class="bg-white shadow-lg">
+<body class="bg-gray-50">
+    <nav class="bg-white/80 backdrop-blur-sm shadow-sm fixed w-full z-10">
         <div class="max-w-7xl mx-auto px-4">
             <div class="flex justify-between h-16">
-                <div class="flex">
-                    <div class="flex-shrink-0 flex items-center">
+                <div class="flex items-center">
                         <a href="/" class="text-xl font-bold text-gray-800">MediSynth</a>
                     </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                        <a href="/" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Home
-                        </a>
-                        <a href="/documentation" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Documentation
-                        </a>
+                <div class="hidden sm:ml-6 sm:flex sm:items-center sm:space-x-4">
+                    <a href="/" class="{{if eq .ActivePage "Home"}}nav-link-active{{else}}nav-link{{end}}">Home</a>
+                    <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}nav-link-active{{else}}nav-link{{end}}">Documentation</a>
                         {{if .User}}
-                        <a href="/dashboard" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            Dashboard
-                        </a>
-                        <a href="/tokens" class="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
-                            API Tokens
-                        </a>
+                    <a href="/dashboard" class="{{if eq .ActivePage "Dashboard"}}nav-link-active{{else}}nav-link{{end}}">Dashboard</a>
+                    <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}nav-link-active{{else}}nav-link{{end}}">API Tokens</a>
                         {{end}}
-                    </div>
                 </div>
-                <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                <div class="flex items-center">
                     {{if .User}}
-                    <div class="ml-3 relative">
-                        <div class="flex items-center">
-                            <span class="text-gray-700 mr-4">{{.User.Email}}</span>
-                            <form action="/logout" method="POST" class="inline">
-                                <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-medium">
-                                    Logout
-                                </button>
-                            </form>
-                        </div>
-                    </div>
+                        <span class="text-sm text-gray-600 mr-4">Welcome, {{.User.Email}}</span>
+                        <a href="/logout" class="px-4 py-2 rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700">Logout</a>
                     {{else}}
-                    <a href="/login" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium">Login</a>
-                    <a href="/register" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">Register</a>
+                        <a href="/login" class="nav-link">Login</a>
+                        <a href="/register" class="ml-2 px-4 py-2 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">Register</a>
                     {{end}}
                 </div>
             </div>
         </div>
     </nav>
-
-    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <main class="pt-16">
         {{block "content" .}}{{end}}
     </main>
-
-    <footer class="bg-white shadow-lg mt-8">
-        <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-            <p class="text-center text-gray-500 text-sm">
-                &copy; 2024 MediSynth. All rights reserved.
-            </p>
+    <footer class="bg-white mt-8 py-4">
+        <div class="max-w-7xl mx-auto px-4">
+            <p class="text-center text-gray-500 text-sm">&copy; 2024 MediSynth. All rights reserved.</p>
         </div>
     </footer>
 </body>

@@ -2,6 +2,7 @@ package config
 
 import (
 	"log"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -16,6 +17,11 @@ type Config struct {
 		MaxRetries int    `yaml:"maxRetries"`
 		RetryDelay int    `yaml:"retryDelay"`
 	} `yaml:"database"`
+	Domains struct {
+		Portal string `yaml:"portal"`
+		API    string `yaml:"api"`
+		Secure bool   `yaml:"secure"`
+	} `yaml:"domains"`
 }
 
 // LoadConfig loads the configuration from file and environment variables.
@@ -72,6 +78,24 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Database.RetryDelay == 0 {
 		cfg.Database.RetryDelay = 5
+	}
+
+	// Set default domains if not specified
+	if cfg.Domains.Portal == "" {
+		cfg.Domains.Portal = "portal.medisynth.io" // Default to production domain
+		log.Println("Portal domain not specified, using default portal.medisynth.io")
+	}
+	if cfg.Domains.API == "" {
+		cfg.Domains.API = "api.medisynth.io" // Default to production domain
+		log.Println("API domain not specified, using default api.medisynth.io")
+	}
+
+	// Only set secure default if it wasn't specified in the config file
+	if !v.IsSet("domains.secure") {
+		// Default to secure only in production
+		env := os.Getenv("MEDISYNTH_ENV")
+		cfg.Domains.Secure = env == "prod"
+		log.Printf("Domain security not specified, defaulting to %v based on environment", cfg.Domains.Secure)
 	}
 
 	log.Printf("Configuration loaded: %+v", cfg)

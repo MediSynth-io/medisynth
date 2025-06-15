@@ -24,7 +24,7 @@ spec:
         image: ghcr.io/medisynth-io/medisynth:latest
         imagePullPolicy: Always
         ports:
-        - containerPort: 8081
+        - containerPort: 8081 
           name: http
         resources:
           requests:
@@ -51,10 +51,22 @@ spec:
         - name: config
           mountPath: /app/config
         env:
+        - name: MEDISYNTH_ENV
+          value: "prod"
         - name: CONFIG_DIR
           value: /app/config
         - name: DB_PATH
           value: /data/medisynth.db
+        - name: MEDISYNTH_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-secrets
+              key: jwt-secret
+        - name: MEDISYNTH_SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-secrets
+              key: session-secret
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000

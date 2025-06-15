@@ -11,12 +11,13 @@ type User struct {
 }
 
 type Token struct {
-	ID        int64
-	UserID    int64
-	Name      string
-	Token     string
-	CreatedAt time.Time
-	ExpiresAt *time.Time
+	ID         int64
+	UserID     int64
+	Name       string
+	Token      string
+	CreatedAt  time.Time
+	ExpiresAt  *time.Time
+	LastUsedAt *time.Time
 }
 
 type Session struct {

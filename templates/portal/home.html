@@ -1,31 +1,43 @@
-{{define "title"}}MediSynth - Synthetic Medical Data Generation{{end}}
+{{template "base.html" .}}
+
+{{define "title"}}Welcome - MediSynth Portal{{end}}
 
 {{define "content"}}
 <div class="bg-white shadow overflow-hidden sm:rounded-lg">
     <div class="px-4 py-5 sm:px-6">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">
-            Welcome to MediSynth
-        </h3>
-        <p class="mt-1 max-w-2xl text-sm text-gray-500">
-            Generate synthetic medical data for testing and development.
-        </p>
+        <h1 class="text-3xl font-bold text-gray-900">Welcome to MediSynth</h1>
+        <p class="mt-1 max-w-2xl text-sm text-gray-500">Your medical data synthesis platform</p>
     </div>
     <div class="border-t border-gray-200">
-        <div class="px-4 py-5 sm:p-6">
-            <div class="text-base text-gray-500">
-                <p class="mb-4">
-                    MediSynth provides a powerful API for generating realistic synthetic medical data. 
-                    Perfect for testing, development, and training purposes.
+        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+            <div class="col-span-3 space-y-6">
+                <p class="text-gray-700">
+                    MediSynth is a powerful platform for medical data synthesis and analysis. Get started by:
                 </p>
-                <div class="mt-6">
-                    <a href="/documentation" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        View Documentation
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {{if .User}}
+                    <a href="/dashboard" class="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50">
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">Dashboard</h5>
+                        <p class="font-normal text-gray-700">Access your personalized dashboard to manage your data and projects.</p>
                     </a>
-                    {{if not .User}}
-                    <a href="/register" class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        Get Started
+                    <a href="/tokens" class="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50">
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">API Tokens</h5>
+                        <p class="font-normal text-gray-700">Generate and manage your API tokens for programmatic access.</p>
+                    </a>
+                    {{else}}
+                    <a href="/login" class="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50">
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">Sign In</h5>
+                        <p class="font-normal text-gray-700">Log in to your account to access your dashboard and manage your data.</p>
+                    </a>
+                    <a href="/register" class="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50">
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">Register</h5>
+                        <p class="font-normal text-gray-700">Create a new account to get started with MediSynth.</p>
                     </a>
                     {{end}}
+                    <a href="/documentation" class="block p-6 bg-white rounded-lg border border-gray-200 shadow-md hover:bg-gray-50">
+                        <h5 class="mb-2 text-2xl font-bold tracking-tight text-gray-900">Documentation</h5>
+                        <p class="font-normal text-gray-700">Learn more about MediSynth's features and API integration.</p>
+                    </a>
                 </div>
             </div>
         </div>

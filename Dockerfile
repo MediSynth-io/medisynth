@@ -1,34 +1,40 @@
-# Build stage
-FROM golang:1.23 as builder
-
-# Install build dependencies
-RUN apt-get update && apt-get install -y gcc
+# Use Go 1.23.1 for both build and runtime
+FROM golang:1.23.1
 
 WORKDIR /app
 
-# Download all dependencies
+# Copy only what's needed for go mod download first
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the source code
+# Copy the rest of the source code
 COPY . .
 
-# Build the application with CGO enabled
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
+# Build the applications
+RUN go build -o medisynth-api ./cmd/api/main.go && \
+    go build -o medisynth-portal ./cmd/portal/main.go && \
+    chmod +x medisynth-api medisynth-portal
 
-# Use a smaller image for the final stage
-FROM alpine:latest
+# Create data directory
+RUN mkdir -p data
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates
-
-WORKDIR /app
-
-# Copy the binary from builder
-COPY --from=builder /app/medisynth-api .
+# Install curl for debugging
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Expose the application port
 EXPOSE 8081
 
-# Run the application
-CMD ["./medisynth-api"] 
+# Run the appropriate application based on the SERVICE_TYPE environment variable
+CMD if [ "$SERVICE_TYPE" = "portal" ]; then \
+      if [ "$MEDISYNTH_ENV" = "prod" ]; then \
+        ./medisynth-portal -config app.prod.yml; \
+      else \
+        ./medisynth-portal -config app.yml; \
+      fi \
+    else \
+      if [ "$MEDISYNTH_ENV" = "prod" ]; then \
+        ./medisynth-api -config app.prod.yml; \
+      else \
+        ./medisynth-api -config app.yml; \
+      fi \
+    fi

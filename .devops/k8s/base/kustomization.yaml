@@ -7,6 +7,7 @@ resources:
   - ingress.yaml
   - configmap.yaml
   - sqlite-pvc.yaml
+  - secrets.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: medisynth-api

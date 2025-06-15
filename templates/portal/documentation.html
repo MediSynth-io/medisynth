@@ -1,286 +1,226 @@
-{{define "title"}}API Documentation - MediSynth Portal{{end}}
+{{template "base.html" .}}
+
+{{define "title"}}Documentation - MediSynth Portal{{end}}
 
 {{define "content"}}
-<div class="bg-white shadow-lg rounded-lg">
-    <div class="bg-blue-600 text-white py-10 text-center rounded-t-lg">
-        <h1 class="text-4xl font-bold mb-2">Medisynth API Documentation</h1>
-        <p class="text-lg">Complete guide to using the Medisynth API</p>
-    </div>
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div class="px-4 py-6 sm:px-0">
+        <div class="border-b border-gray-200 pb-5">
+            <h1 class="text-3xl font-bold leading-tight text-gray-900">API Documentation</h1>
+            <p class="mt-2 text-sm text-gray-500">Complete guide to using the MediSynth API</p>
+        </div>
 
-    <div class="p-8">
-        <section id="toc" class="mb-12 p-6 bg-gray-50 rounded-lg">
-            <h2 class="text-3xl font-semibold mb-4 text-blue-600">Table of Contents</h2>
-            <nav class="space-y-2">
-                <div><a href="#introduction" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Introduction</a></div>
-                <div><a href="#getting-started" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Getting Started</a></div>
-                <div class="ml-4">
-                    <a href="#quick-start" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Quick Start Guide</a>
+        <div class="mt-8 space-y-12">
+            <!-- Authentication -->
+            <section id="authentication" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-900">Authentication</h2>
+                <p class="text-gray-600">All API requests must be authenticated using a Bearer token.</p>
+                <div class="bg-gray-50 p-4 rounded-md">
+                    <pre class="text-sm text-gray-800">curl -H "Authorization: Bearer YOUR_API_TOKEN" https://api.medisynth.io/v1/...</pre>
                 </div>
-                <div class="ml-4">
-                    <a href="#authentication" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Authentication</a>
+            </section>
+
+            <!-- Endpoints -->
+            <section id="endpoints" class="space-y-8">
+                <h2 class="text-2xl font-bold text-gray-900">Endpoints</h2>
+
+                <!-- Generate Data -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Generate Synthetic Data
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            POST /v1/generate
+                        </p>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                Generate synthetic medical data based on specified parameters.
+                            </p>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "count": 100,
+  "type": "patient",
+  "parameters": {
+    "age_range": [20, 80],
+    "conditions": ["diabetes", "hypertension"],
+    "include_medications": true
+  }
+}</pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "data": [{
+    "id": "p_123",
+    "age": 45,
+    "conditions": ["diabetes"],
+    "medications": [{
+      "name": "Metformin",
+      "dosage": "500mg"
+    }]
+  }, ...]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div><a href="#api-endpoints" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">API Endpoints</a></div>
-                <div class="ml-4">
-                    <a href="#submit-job" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Submit Generation Job</a>
+
+                <!-- Validate Data -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Validate Data
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            POST /v1/validate
+                        </p>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                Validate medical data against known patterns and rules.
+                            </p>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "data": [{
+    "id": "p_123",
+    "age": 45,
+    "conditions": ["diabetes"],
+    "medications": [{
+      "name": "Metformin",
+      "dosage": "500mg"
+    }]
+  }]
+}</pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "valid": true,
+  "errors": [],
+  "warnings": [{
+    "field": "medications[0].dosage",
+    "message": "Consider specifying frequency"
+  }]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="ml-4">
-                    <a href="#check-status" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Check Job Status</a>
+
+                <!-- Export Data -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Export Data
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            POST /v1/export
+                        </p>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                Export generated data in various formats.
+                            </p>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "format": "csv",
+  "data_ids": ["p_123", "p_124"],
+  "fields": ["id", "age", "conditions"]
+}</pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
+                                <p class="text-sm text-gray-600">Returns a file in the requested format.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="ml-4">
-                    <a href="#heartbeat" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Heartbeat Endpoint</a>
+            </section>
+
+            <!-- Error Handling -->
+            <section id="errors" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-900">Error Handling</h2>
+                <p class="text-gray-600">The API uses conventional HTTP response codes to indicate success or failure.</p>
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <ul class="list-disc list-inside text-sm text-gray-600">
+                                <li><span class="font-medium">200</span> - Success</li>
+                                <li><span class="font-medium">400</span> - Bad Request (invalid parameters)</li>
+                                <li><span class="font-medium">401</span> - Unauthorized (invalid token)</li>
+                                <li><span class="font-medium">403</span> - Forbidden (insufficient permissions)</li>
+                                <li><span class="font-medium">404</span> - Not Found</li>
+                                <li><span class="font-medium">429</span> - Too Many Requests</li>
+                                <li><span class="font-medium">500</span> - Internal Server Error</li>
+                            </ul>
+                            <div class="mt-4">
+                                <h4 class="text-sm font-medium text-gray-900">Error Response Format</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "error": {
+    "code": "invalid_parameters",
+    "message": "Invalid age range specified",
+    "details": {
+      "field": "parameters.age_range",
+      "reason": "Maximum age must be less than 120"
+    }
+  }
+}</pre>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div><a href="#output-formats" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Output Formats</a></div>
-                <div><a href="#error-handling" class="text-blue-600 hover:text-blue-800 transition-colors duration-200">Error Handling</a></div>
-            </nav>
-        </section>
+            </section>
 
-        <section id="introduction" class="mb-12 p-6 bg-white border rounded-lg">
-            <h2 class="text-3xl font-semibold mb-4 text-blue-600">Introduction</h2>
-            <p class="text-lg leading-relaxed">Welcome to the Medisynth API documentation. This API allows you to generate synthetic patient data based on various parameters. Patient data generation is an asynchronous process. You first submit a job request, and the API will return a <code class="bg-gray-100 text-gray-800 px-2 py-1 rounded font-mono text-sm">jobID</code>. You can then use this <code class="bg-gray-100 text-gray-800 px-2 py-1 rounded font-mono text-sm">jobID</code> to poll for the job's status and retrieve the results once completed.</p>
-            <p class="text-lg leading-relaxed mt-4">All API requests should be made to the base URL: <code class="bg-gray-100 text-gray-800 px-2 py-1 rounded font-mono text-sm">https://api.medisynth.io</code>.</p>
-        </section>
-
-        <section id="getting-started" class="mb-12 p-6 bg-white border rounded-lg">
-            <h2 class="text-3xl font-semibold mb-4 text-blue-600">Getting Started</h2>
-            <p class="text-lg leading-relaxed mb-6">This section will help you get up and running with the Medisynth API quickly.</p>
-
-            <h3 id="quick-start" class="text-2xl font-semibold mb-3 text-gray-700">Quick Start Guide</h3>
-            <p class="text-lg leading-relaxed mb-4">Here's a simple example to generate a single patient with default settings:</p>
-            <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>curl -X POST https://api.medisynth.io/generate-patients \
--H "Content-Type: application/json" \
--d '{
-  "population": 1
-}'</code></pre>
-
-            <h3 id="authentication" class="text-2xl font-semibold mb-3 mt-6 text-gray-700">Authentication</h3>
-            <p class="text-lg leading-relaxed mb-4">The API uses API key authentication. You'll need to include your API key in the Authorization header of each request.</p>
-            
-            <div class="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 class="font-medium text-blue-800 mb-2">Getting Your API Key</h4>
-                <p class="text-sm text-blue-600 mb-2">To get your API key:</p>
-                <ol class="list-decimal list-inside text-sm text-blue-600 space-y-1">
-                    <li>Register for an account using the form above</li>
-                    <li>Navigate to the <a href="/tokens" class="underline">API Tokens</a> page in your dashboard</li>
-                    <li>Generate a new API token</li>
-                    <li>Keep your API key secure and never share it publicly</li>
-                </ol>
-            </div>
-
-            <h4 class="text-xl font-semibold mb-2 text-gray-600">Example with Authentication</h4>
-            <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>curl -X POST https://api.medisynth.io/generate-patients \
--H "Content-Type: application/json" \
--H "Authorization: Bearer your_api_key_here" \
--d '{
-  "population": 1
-}'</code></pre>
-
-            <div class="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                <h4 class="font-medium text-yellow-800 mb-2">Security Best Practices</h4>
-                <ul class="list-disc list-inside text-sm text-yellow-600 space-y-1">
-                    <li>Never commit API keys to version control</li>
-                    <li>Rotate your API keys regularly</li>
-                    <li>Use environment variables to store API keys</li>
-                    <li>Monitor your API usage for any suspicious activity</li>
-                </ul>
-            </div>
-        </section>
-
-        <section id="api-endpoints" class="mb-12 p-6 bg-white border rounded-lg">
-            <h2 class="text-3xl font-semibold mb-4 text-blue-600">API Endpoints</h2>
-            <p class="text-lg leading-relaxed mb-6">The following sections detail each available endpoint and its usage.</p>
-
-            <div id="submit-job" class="mb-8 p-4 bg-gray-50 rounded-lg">
-                <h3 class="text-2xl font-semibold mb-4 text-gray-700">1. Submit Generation Job</h3>
-                <div>
-                    <p class="text-lg mb-3">
-                        <span class="bg-blue-500 text-white px-3 py-1 rounded font-medium mr-2 inline-block">POST</span> 
-                        <code class="text-lg">/generate-patients</code>
-                    </p>
-                    <p class="text-lg leading-relaxed mb-6">This endpoint accepts parameters for synthetic patient data generation and submits a new job. The API will respond immediately with a job ID.</p>
-
-                    <h4 class="text-xl font-semibold mb-3 text-gray-600">Request Body Parameters</h4>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white border border-gray-300">
-                            <thead class="bg-gray-50">
+            <!-- Rate Limiting -->
+            <section id="rate-limiting" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-900">Rate Limiting</h2>
+                <p class="text-gray-600">API requests are rate limited based on your subscription tier.</p>
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Parameter</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Type</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Description</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">Required</th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tier
+                                    </th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Rate Limit
+                                    </th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Burst Limit
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">population</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Integer</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">The number of patients to generate.</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Optional (default: 1)</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Free</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">100/hour</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">200</td>
                                 </tr>
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">outputFormat</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">String</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">Desired output format. Supported: "fhir", "ccda", "csv".</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Optional (default: "fhir")</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Pro</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1000/hour</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2000</td>
                                 </tr>
                                 <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">ageMin</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Integer</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">The minimum age for the generated patients.</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Optional</td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">ageMax</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Integer</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">The maximum age for the generated patients.</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Optional</td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">gender</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">String</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">The gender of the patients (e.g., "M", "F").</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Optional</td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">state</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">String</td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">The US state for patient localization (e.g., "Massachusetts").</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Optional</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Enterprise</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Custom</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Custom</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
-
-                    <h4 class="text-xl font-semibold mb-3 mt-6 text-gray-600">Example Request</h4>
-                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>curl -X POST https://api.medisynth.io/generate-patients \
--H "Content-Type: application/json" \
--H "Authorization: Bearer your_api_key_here" \
--d '{
-  "population": 2,
-  "outputFormat": "fhir",
-  "ageMin": 40,
-  "ageMax": 60,
-  "state": "Washington",
-  "gender": "F"
-}'</code></pre>
-
-                    <h4 class="text-xl font-semibold mb-3 mt-6 text-gray-600">Successful Response (HTTP 202 Accepted)</h4>
-                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>{
-  "jobID": "yourGeneratedJobID",
-  "message": "Generation request accepted. Check status using the jobID.",
-  "status": "pending",
-  "statusUrl": "api.medisynth.io/generation-status/yourGeneratedJobID"
-}</code></pre>
                 </div>
-            </div>
-
-            <div id="check-status" class="mb-8 p-4 bg-gray-50 rounded-lg">
-                <h3 class="text-2xl font-semibold mb-4 text-gray-700">2. Check Job Status</h3>
-                <div>
-                    <p class="text-lg mb-3">
-                        <span class="bg-green-500 text-white px-3 py-1 rounded font-medium mr-2 inline-block">GET</span> 
-                        <code class="text-lg">/generation-status/{jobID}</code>
-                    </p>
-                    <p class="text-lg leading-relaxed mb-6">Use the <code class="bg-gray-100 text-gray-800 px-2 py-1 rounded font-mono text-sm">jobID</code> received from the submission step to poll this endpoint for the job's status and results.</p>
-
-                    <h4 class="text-xl font-semibold mb-3 text-gray-600">Example Request</h4>
-                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>curl -H "Authorization: Bearer your_api_key_here" \
-https://api.medisynth.io/generation-status/yourGeneratedJobID</code></pre>
-
-                    <h4 class="text-xl font-semibold mb-3 mt-6 text-gray-600">Response Examples</h4>
-                    
-                    <h5 class="text-lg font-semibold mb-2 text-gray-600">Pending/Running (HTTP 200 OK)</h5>
-                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>{
-  "jobID": "yourGeneratedJobID",
-  "status": "pending",
-  "createdAt": "2025-06-13T...",
-  "updatedAt": "2025-06-13T..."
-}</code></pre>
-
-                    <h5 class="text-lg font-semibold mb-2 text-gray-600">Completed (HTTP 200 OK)</h5>
-                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>{
-  "jobID": "yourGeneratedJobID",
-  "status": "completed",
-  "createdAt": "...",
-  "updatedAt": "...",
-  "patientSummaries": [
-    "1 -- Patient Name One (age y/o G) Location (SyntheaID)",
-    "2 -- Patient Name Two (age y/o G) Location (SyntheaID)"
-  ],
-  "outputFormatUsed": "fhir",
-  "outputGenerated": "true",
-  "outputFileContent": [ 
-    { /* FHIR Bundle for patient 1 */ },
-    { /* FHIR Bundle for patient 2 */ }
-  ]
-}</code></pre>
-                </div>
-            </div>
-
-            <div id="heartbeat" class="mb-8 p-4 bg-gray-50 rounded-lg">
-                <h3 class="text-2xl font-semibold mb-4 text-gray-700">3. Heartbeat Endpoint</h3>
-                <div>
-                    <p class="text-lg mb-3">
-                        <span class="bg-green-500 text-white px-3 py-1 rounded font-medium mr-2 inline-block">GET</span> 
-                        <code class="text-lg">/heartbeat</code>
-                    </p>
-                    <p class="text-lg leading-relaxed mb-6">Checks the health of the API.</p>
-                    
-                    <h4 class="text-xl font-semibold mb-3 text-gray-600">Successful Response (HTTP 200 OK)</h4>
-                    <pre class="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-x-auto my-4 font-mono text-sm"><code>{
-  "status": "ok"
-}</code></pre>
-                </div>
-            </div>
-        </section>
-
-        <section id="output-formats" class="mb-12 p-6 bg-white border rounded-lg">
-            <h2 class="text-3xl font-semibold mb-4 text-blue-600">Output Formats</h2>
-            <p class="text-lg leading-relaxed mb-6">The API supports multiple output formats for the generated patient data:</p>
-            
-            <div class="space-y-4">
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <h3 class="text-xl font-semibold mb-2 text-gray-700">FHIR (Default)</h3>
-                    <p class="text-gray-600">Fast Healthcare Interoperability Resources format. Returns JSON objects containing FHIR Bundle resources.</p>
-                </div>
-                
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <h3 class="text-xl font-semibold mb-2 text-gray-700">CCDA</h3>
-                    <p class="text-gray-600">Consolidated Clinical Document Architecture format. Returns XML content as a string.</p>
-                </div>
-                
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <h3 class="text-xl font-semibold mb-2 text-gray-700">CSV</h3>
-                    <p class="text-gray-600">Comma-separated values format. Returns an array of objects with fileName and content properties.</p>
-                </div>
-            </div>
-        </section>
-
-        <section id="error-handling" class="mb-12 p-6 bg-white border rounded-lg">
-            <h2 class="text-3xl font-semibold mb-4 text-blue-600">Error Handling</h2>
-            <p class="text-lg leading-relaxed mb-6">The API uses standard HTTP status codes to indicate the success or failure of requests:</p>
-            
-            <div class="space-y-4">
-                <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                    <h3 class="text-xl font-semibold mb-2 text-red-700">400 Bad Request</h3>
-                    <p class="text-red-600">The request was invalid or cannot be served. Check your request parameters.</p>
-                </div>
-                
-                <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                    <h3 class="text-xl font-semibold mb-2 text-red-700">401 Unauthorized</h3>
-                    <p class="text-red-600">Authentication failed. Check your API key.</p>
-                </div>
-                
-                <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                    <h3 class="text-xl font-semibold mb-2 text-red-700">404 Not Found</h3>
-                    <p class="text-red-600">The requested resource was not found. Check your endpoint URL.</p>
-                </div>
-                
-                <div class="p-4 bg-red-50 rounded-lg border border-red-200">
-                    <h3 class="text-xl font-semibold mb-2 text-red-700">500 Internal Server Error</h3>
-                    <p class="text-red-600">An error occurred on the server. Please try again later.</p>
-                </div>
-            </div>
-        </section>
+            </section>
+        </div>
     </div>
 </div>
 {{end}} 

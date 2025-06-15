@@ -110,11 +110,43 @@ func initTables() error {
 			name TEXT NOT NULL,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			expires_at DATETIME,
+			last_used_at DATETIME,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		)
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to create api_tokens table: %v", err)
+	}
+
+	// Add last_used_at column to api_tokens table if it doesn't exist (for migrations)
+	rows, err := db.Query("PRAGMA table_info(api_tokens)")
+	if err != nil {
+		return fmt.Errorf("failed to query table info for api_tokens: %v", err)
+	}
+	defer rows.Close()
+
+	var hasLastUsedAt bool
+	for rows.Next() {
+		var (
+			cid        int
+			name       string
+			type_      string
+			notnull    int
+			dflt_value *string
+			pk         int
+		)
+		if err := rows.Scan(&cid, &name, &type_, &notnull, &dflt_value, &pk); err == nil {
+			if name == "last_used_at" {
+				hasLastUsedAt = true
+				break
+			}
+		}
+	}
+	if !hasLastUsedAt {
+		_, err := db.Exec("ALTER TABLE api_tokens ADD COLUMN last_used_at DATETIME")
+		if err != nil {
+			return fmt.Errorf("failed to add last_used_at column: %v", err)
+		}
 	}
 
 	// Create sessions table
@@ -211,9 +243,9 @@ func CreateToken(userID int64, name, token string, expiresAt *time.Time) (*Token
 func GetTokenByID(id int64) (*Token, error) {
 	var token Token
 	err := db.QueryRow(
-		"SELECT id, user_id, name, token, created_at, expires_at FROM api_tokens WHERE id = ?",
+		"SELECT id, user_id, name, token, created_at, expires_at, last_used_at FROM api_tokens WHERE id = ?",
 		id,
-	).Scan(&token.ID, &token.UserID, &token.Name, &token.Token, &token.CreatedAt, &token.ExpiresAt)
+	).Scan(&token.ID, &token.UserID, &token.Name, &token.Token, &token.CreatedAt, &token.ExpiresAt, &token.LastUsedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -223,9 +255,9 @@ func GetTokenByID(id int64) (*Token, error) {
 func GetTokenByValue(token string) (*Token, error) {
 	var tokenObj Token
 	err := db.QueryRow(
-		"SELECT id, user_id, name, token, created_at, expires_at FROM api_tokens WHERE token = ?",
+		"SELECT id, user_id, name, token, created_at, expires_at, last_used_at FROM api_tokens WHERE token = ?",
 		token,
-	).Scan(&tokenObj.ID, &tokenObj.UserID, &tokenObj.Name, &tokenObj.Token, &tokenObj.CreatedAt, &tokenObj.ExpiresAt)
+	).Scan(&tokenObj.ID, &tokenObj.UserID, &tokenObj.Name, &tokenObj.Token, &tokenObj.CreatedAt, &tokenObj.ExpiresAt, &tokenObj.LastUsedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +266,7 @@ func GetTokenByValue(token string) (*Token, error) {
 
 func GetUserTokens(userID int64) ([]*Token, error) {
 	rows, err := db.Query(
-		"SELECT id, user_id, name, token, created_at, expires_at FROM api_tokens WHERE user_id = ?",
+		"SELECT id, user_id, name, token, created_at, expires_at, last_used_at FROM api_tokens WHERE user_id = ?",
 		userID,
 	)
 	if err != nil {
@@ -245,7 +277,7 @@ func GetUserTokens(userID int64) ([]*Token, error) {
 	var tokens []*Token
 	for rows.Next() {
 		var token Token
-		err := rows.Scan(&token.ID, &token.UserID, &token.Name, &token.Token, &token.CreatedAt, &token.ExpiresAt)
+		err := rows.Scan(&token.ID, &token.UserID, &token.Name, &token.Token, &token.CreatedAt, &token.ExpiresAt, &token.LastUsedAt)
 		if err != nil {
 			return nil, err
 		}

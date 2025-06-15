@@ -16,6 +16,7 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/portal"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 )
 
 type Api struct {
@@ -33,8 +34,11 @@ func NewApi(config config.Config) (*Api, error) {
 		return nil, fmt.Errorf("failed to initialize database: %v", err)
 	}
 
-	// Initialize portal
-	p, err := portal.New()
+	// Initialize auth with config
+	auth.InitAuth(&config)
+
+	// Initialize portal with config
+	p, err := portal.New(&config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize portal: %v", err)
 	}
@@ -50,18 +54,34 @@ func NewApi(config config.Config) (*Api, error) {
 func (api *Api) Serve() {
 	r := chi.NewRouter()
 
+	// Add CORS middleware before other middleware
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"http://*.local:*", "http://localhost:*", "http://127.0.0.1:*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		ExposedHeaders:   []string{"Link"},
+		AllowCredentials: true,
+		MaxAge:           300,
+	}))
+
 	// Middleware
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 
+	// Add a simple, standalone ping route for debugging
+	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("pong"))
+	})
+
 	// Custom NotFound handler for debugging
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("CHI ROUTER - NOT FOUND: Path='%s', RawQuery='%s'", r.URL.Path, r.URL.RawQuery)
 
 		// Don't redirect if we're already on the portal domain
-		if r.Host == "portal.medisynth.io" {
+		if r.Host == api.Config.Domains.Portal {
 			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
 			return
 		}
@@ -72,47 +92,22 @@ func (api *Api) Serve() {
 			return
 		}
 
-		// For non-API paths on api.medisynth.io, redirect to portal
-		portalURL := fmt.Sprintf("https://portal.medisynth.io%s", r.URL.Path)
-		http.Redirect(w, r, portalURL, http.StatusMovedPermanently)
+		// For non-API paths on api domain, redirect to portal
+		if r.Host == api.Config.Domains.API {
+			scheme := "http"
+			if api.Config.Domains.Secure {
+				scheme = "https"
+			}
+			portalURL := fmt.Sprintf("%s://%s:%d%s", scheme, api.Config.Domains.Portal, api.Config.APIPort, r.URL.Path)
+			http.Redirect(w, r, portalURL, http.StatusSeeOther)
+		} else {
+			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
+		}
 	})
 
 	// Mount routes based on domain
 	r.Group(func(r chi.Router) {
-		r.Use(func(next http.Handler) http.Handler {
-			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.Host {
-				case "portal.medisynth.io":
-					// Mount portal routes at root for portal domain
-					api.portal.Routes().ServeHTTP(w, r)
-				case "api.medisynth.io":
-					// Mount API routes
-					apiRoutes := chi.NewRouter()
-					apiRoutes.Get("/heartbeat", api.Heartbeat)
-					apiRoutes.Post("/auth/register", auth.RegisterHandler)
-					apiRoutes.Post("/auth/login", auth.LoginHandler)
-
-					// Protected routes
-					apiRoutes.Group(func(r chi.Router) {
-						r.Use(auth.AuthMiddleware(auth.GetTokenManager()))
-						r.Use(auth.RequireAuth)
-
-						// Token management
-						r.Post("/auth/tokens", auth.CreateTokenHandler)
-						r.Get("/auth/tokens", auth.ListTokensHandler)
-						r.Delete("/auth/tokens/{id}", auth.DeleteTokenHandler)
-
-						// API routes
-						r.Post("/generate-patients", api.RunSyntheaGeneration)
-						r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
-					})
-
-					apiRoutes.ServeHTTP(w, r)
-				default:
-					next.ServeHTTP(w, r)
-				}
-			})
-		})
+		r.Use(DomainMiddleware(api.portal.Routes(), api.Routes(), &api.Config))
 	})
 
 	// Start session cleanup goroutine
@@ -128,8 +123,75 @@ func (api *Api) Serve() {
 		}
 	}()
 
-	log.Printf("Starting server on port %d...", api.Config.APIPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", api.Config.APIPort), r))
+	log.Printf("Starting API server on 0.0.0.0:%d", api.Config.APIPort)
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", api.Config.APIPort), r))
+}
+
+func (api *Api) Routes() http.Handler {
+	apiRoutes := chi.NewRouter()
+	apiRoutes.Get("/heartbeat", api.Heartbeat)
+	apiRoutes.Post("/auth/register", auth.RegisterHandler)
+	apiRoutes.Post("/auth/login", auth.LoginHandler)
+
+	// Protected routes
+	apiRoutes.Group(func(r chi.Router) {
+		r.Use(auth.AuthMiddleware(auth.GetTokenManager()))
+		r.Use(auth.RequireAuth)
+
+		// Token management
+		r.Post("/auth/tokens", auth.CreateTokenHandler)
+		r.Get("/auth/tokens", auth.ListTokensHandler)
+		r.Delete("/auth/tokens/{id}", auth.DeleteTokenHandler)
+
+		// API routes
+		r.Post("/generate-patients", api.RunSyntheaGeneration)
+		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+	})
+	return apiRoutes
+}
+
+func DomainMiddleware(portalHandler, apiHandler http.Handler, config *config.Config) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract host and port
+			hostParts := strings.Split(r.Host, ":")
+			host := hostParts[0]
+			port := "80"
+			if len(hostParts) > 1 {
+				port = hostParts[1]
+			}
+
+			// Try exact domain matches first
+			if strings.HasPrefix(host, config.Domains.Portal) {
+				portalHandler.ServeHTTP(w, r)
+				return
+			}
+
+			if strings.HasPrefix(host, config.Domains.API) {
+				apiHandler.ServeHTTP(w, r)
+				return
+			}
+
+			// If no exact match, try localhost or IP
+			if host == "localhost" || host == "127.0.0.1" {
+				// Use the port to determine which service to route to
+				if port == fmt.Sprintf("%d", config.APIPort) {
+					apiHandler.ServeHTTP(w, r)
+					return
+				}
+				if port == "8082" { // Portal port
+					portalHandler.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			// Log unmatched requests for debugging
+			log.Printf("Unmatched request - Host: %s, Port: %s, Path: %s", host, port, r.URL.Path)
+
+			// If no domain matches, proceed to the next handler
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 func (api *Api) Heartbeat(w http.ResponseWriter, r *http.Request) {

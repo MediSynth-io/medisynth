@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -13,7 +14,13 @@ var (
 	userStore    *SQLiteUserStore
 	tokenManager *TokenManager
 	apiKeyStore  *SQLiteAPIKeyStore
+	appConfig    *config.Config
 )
+
+// InitAuth initializes the auth package with configuration
+func InitAuth(cfg *config.Config) {
+	appConfig = cfg
+}
 
 // GetUserStore returns the global user store instance
 func GetUserStore() *SQLiteUserStore {
@@ -70,12 +77,12 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !validateEmail(req.Email) {
+	if !ValidateEmail(req.Email) {
 		http.Error(w, "Invalid email", http.StatusBadRequest)
 		return
 	}
 
-	if !validatePassword(req.Password) {
+	if !ValidatePassword(req.Password) {
 		http.Error(w, "Invalid password", http.StatusBadRequest)
 		return
 	}

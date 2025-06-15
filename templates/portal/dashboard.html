@@ -1,54 +1,62 @@
+{{template "base.html" .}}
+
 {{define "title"}}Dashboard - MediSynth Portal{{end}}
 
 {{define "content"}}
-<div class="bg-white shadow overflow-hidden sm:rounded-lg">
-    <div class="px-4 py-5 sm:px-6">
-        <h3 class="text-lg leading-6 font-medium text-gray-900">
-            Welcome, {{.Email}}
-        </h3>
-        <p class="mt-1 max-w-2xl text-sm text-gray-500">
-            Manage your MediSynth account and API access.
-        </p>
-    </div>
-    <div class="border-t border-gray-200">
-        <dl>
-            <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">
-                    Account created
-                </dt>
-                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {{.CreatedAt.Format "January 2, 2006"}}
-                </dd>
-            </div>
-            <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt class="text-sm font-medium text-gray-500">
-                    API Access
-                </dt>
-                <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    <a href="/tokens" class="text-blue-600 hover:text-blue-500">
-                        Manage API tokens
-                    </a>
-                </dd>
-            </div>
-        </dl>
-    </div>
+<div class="py-10">
+    <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <h1 class="text-3xl font-bold leading-tight text-gray-900">Dashboard</h1>
+        <p class="mt-1 text-sm text-gray-500">Overview of your account activity.</p>
+    </header>
+    <main class="max-w-7xl mx-auto sm:px-6 lg:px-8 mt-6">
+        {{template "data_content" .}}
+    </main>
 </div>
+{{end}}
 
-<div class="mt-8">
-    <div class="bg-white shadow sm:rounded-lg">
-        <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg leading-6 font-medium text-gray-900">
-                Quick Start
-            </h3>
-            <div class="mt-2 max-w-xl text-sm text-gray-500">
-                <p>
-                    Get started with the MediSynth API by creating an API token and following our documentation.
-                </p>
+{{define "data_content"}}
+<div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    <!-- Stat Card: API Requests -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-lg">
+        <div class="p-5 flex items-center">
+            <div class="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+                    </svg>
             </div>
-            <div class="mt-5">
-                <a href="/tokens" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                    Create API Token
-                </a>
+            <div class="ml-4 flex-1">
+                <dt class="text-sm font-medium text-gray-500 truncate">API Requests</dt>
+                <dd class="text-3xl font-semibold text-gray-900">{{.Data.APIRequests}}</dd>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Card: Records Generated -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-lg">
+        <div class="p-5 flex items-center">
+            <div class="flex-shrink-0 bg-green-500 rounded-md p-3">
+                <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+            </div>
+            <div class="ml-4 flex-1">
+                <dt class="text-sm font-medium text-gray-500 truncate">Records Generated</dt>
+                <dd class="text-3xl font-semibold text-gray-900">{{.Data.RecordsGenerated}}</dd>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Card: Account Type -->
+    <div class="bg-white overflow-hidden shadow-sm rounded-lg">
+        <div class="p-5 flex items-center">
+            <div class="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                <svg class="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+            </div>
+            <div class="ml-4 flex-1">
+                <dt class="text-sm font-medium text-gray-500 truncate">Account Type</dt>
+                <dd class="text-3xl font-semibold text-gray-900">{{.Data.AccountType}}</dd>
             </div>
         </div>
     </div>
