@@ -1431,3 +1431,29 @@ func IsLoginBlocked(email, ipAddress string) (bool, time.Duration, error) {
 
 	return false, 0, nil
 }
+
+// UpdateUserState updates a user's state
+func UpdateUserState(userID string, state models.AccountState) error {
+	var query string
+	if dbType == "postgres" {
+		query = "UPDATE users SET state = $1, updated_at = NOW() WHERE id = $2"
+	} else {
+		query = "UPDATE users SET state = ?, updated_at = datetime('now') WHERE id = ?"
+	}
+
+	result, err := dbConn.Exec(query, state, userID)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
+}
