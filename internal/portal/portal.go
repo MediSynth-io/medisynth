@@ -42,23 +42,40 @@ func New(cfg *config.Config) (*Portal, error) {
 	templates := make(map[string]*template.Template)
 	templateDir := "templates/portal"
 
+	// Base templates
+	baseTmpl, err := template.New("base.html").Funcs(funcMap).ParseFiles(filepath.Join(templateDir, "base.html"))
+	if err != nil {
+		return nil, err
+	}
+	adminBaseTmpl, err := template.New("admin-base.html").Funcs(funcMap).ParseFiles(filepath.Join(templateDir, "admin-base.html"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Page templates
 	pages, err := fs.Glob(os.DirFS(templateDir), "*.html")
 	if err != nil {
 		return nil, err
 	}
 
 	for _, page := range pages {
-		if page == "base.html" || page == "admin-base.html" {
-			continue
+		if strings.HasSuffix(page, "base.html") {
+			continue // Skip base templates
 		}
 
-		// All pages now get parsed with both base templates
-		// The handlers will decide which one to execute.
-		tmpl, err := template.New(page).Funcs(funcMap).ParseFiles(
-			filepath.Join(templateDir, "base.html"),
-			filepath.Join(templateDir, "admin-base.html"),
-			filepath.Join(templateDir, page),
-		)
+		var base *template.Template
+		if strings.HasPrefix(page, "admin-") {
+			base = adminBaseTmpl
+		} else {
+			base = baseTmpl
+		}
+
+		tmpl, err := base.Clone()
+		if err != nil {
+			return nil, err
+		}
+
+		tmpl, err = tmpl.ParseFiles(filepath.Join(templateDir, page))
 		if err != nil {
 			log.Printf("Error parsing template %s: %v", page, err)
 			return nil, err
