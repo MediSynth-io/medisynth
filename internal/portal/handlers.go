@@ -134,7 +134,7 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
+	userID := r.Context().Value("userID").(string)
 
 	// Get API tokens count as a simple metric
 	tokens, err := database.GetUserTokens(userID)
@@ -158,7 +158,7 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
+	userID := r.Context().Value("userID").(string)
 	tokens, err := database.GetUserTokens(userID)
 	if err != nil {
 		log.Printf("Error getting tokens: %v", err)
@@ -179,7 +179,7 @@ func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
+	userID := r.Context().Value("userID").(string)
 	name := r.FormValue("name")
 
 	if name == "" {
@@ -199,7 +199,7 @@ func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int64)
+	userID := r.Context().Value("userID").(string)
 	tokenID := chi.URLParam(r, "id")
 	if tokenID == "" {
 		http.Error(w, "Token ID required", http.StatusBadRequest)
@@ -260,7 +260,7 @@ func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmplName
 
 	// Add user context and active page info
 	templateData["ActivePage"] = pageTitle
-	if userID, ok := r.Context().Value("userID").(int64); ok {
+	if userID, ok := r.Context().Value("userID").(string); ok {
 		user, err := database.GetUserByID(userID)
 		if err == nil {
 			templateData["User"] = user

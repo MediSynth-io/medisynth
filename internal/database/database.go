@@ -131,6 +131,19 @@ func GetUserByEmail(email string) (*models.User, error) {
 	return user, nil
 }
 
+// GetUserByID retrieves a user by their ID
+func GetUserByID(id string) (*models.User, error) {
+	user := &models.User{}
+	err := dbConn.QueryRow(
+		"SELECT id, email, password, created_at, updated_at FROM users WHERE id = ?",
+		id,
+	).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 // CreateToken creates a new API token
 func CreateToken(userID string, name, token string, expiresAt *time.Time) (*models.Token, error) {
 	t := &models.Token{

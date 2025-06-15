@@ -50,8 +50,9 @@ Authorization: Bearer <token>
 - `POST /api-keys`: Create a new API key
   ```json
   {
-    "name": "My API Key",
-    "expires_at": "2024-12-31T23:59:59Z"
+    "name": "My Dev Key",
+    "created_at": "2023-01-01T12:00:00Z",
+    "expires_at": "2025-12-31T23:59:59Z"
   }
   ```
 
