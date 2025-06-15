@@ -21,27 +21,45 @@ func Init(cfg *config.Config) error {
 		return nil
 	}
 
+	log.Printf("Initializing database at path: %s", cfg.Database.Path)
+
 	// Ensure data directory exists
 	dataDir := filepath.Dir(cfg.Database.Path)
+	log.Printf("Ensuring data directory exists: %s", dataDir)
+
 	if err := createDataDir(dataDir); err != nil {
-		return err
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	// Check if we can write to the directory
+	if err := checkWritePermissions(dataDir); err != nil {
+		return fmt.Errorf("insufficient permissions for data directory %s: %w", dataDir, err)
 	}
 
 	// Open database connection
 	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_foreign_keys=on", cfg.Database.Path)
+	log.Printf("Opening database connection with DSN: %s", dsn)
+
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %v", err)
 	}
 
+	// Test the connection
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return fmt.Errorf("failed to ping database: %v", err)
+	}
+
 	// Initialize schema
+	log.Printf("Initializing database schema")
 	if err = initSchema(db); err != nil {
 		db.Close()
 		return fmt.Errorf("failed to initialize schema: %v", err)
 	}
 
 	dbConn = db
-	log.Printf("Database initialized at %s", cfg.Database.Path)
+	log.Printf("Database initialized successfully at %s", cfg.Database.Path)
 	return nil
 }
 
@@ -91,14 +109,46 @@ func initSchema(db *sql.DB) error {
 	return nil
 }
 
-// createDataDir ensures the data directory exists
+// createDataDir ensures the data directory exists with proper permissions
 func createDataDir(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		log.Printf("Data directory not found, creating: %s", dir)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create data directory: %w", err)
+	// Check if directory already exists
+	if stat, err := os.Stat(dir); err == nil {
+		if !stat.IsDir() {
+			return fmt.Errorf("path %s exists but is not a directory", dir)
 		}
+		log.Printf("Data directory already exists: %s", dir)
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("failed to stat directory %s: %w", dir, err)
 	}
+
+	// Directory doesn't exist, create it
+	log.Printf("Creating data directory: %s", dir)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	log.Printf("Data directory created successfully: %s", dir)
+	return nil
+}
+
+// checkWritePermissions verifies that we can write to the directory
+func checkWritePermissions(dir string) error {
+	testFile := filepath.Join(dir, ".write_test")
+
+	// Try to create a test file
+	file, err := os.Create(testFile)
+	if err != nil {
+		return fmt.Errorf("cannot create test file: %w", err)
+	}
+	file.Close()
+
+	// Try to remove the test file
+	if err := os.Remove(testFile); err != nil {
+		log.Printf("Warning: failed to remove test file %s: %v", testFile, err)
+	}
+
+	log.Printf("Write permissions verified for directory: %s", dir)
 	return nil
 }
 

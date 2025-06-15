@@ -50,5 +50,10 @@ func LoadConfig() (*Config, error) {
 	}
 
 	log.Printf("Configuration loaded successfully")
+	log.Printf("Database path: %s", cfg.Database.Path)
+	log.Printf("API Port: %d", cfg.APIPort)
+	log.Printf("Domain API: %s", cfg.Domains.API)
+	log.Printf("Domain Portal: %s", cfg.Domains.Portal)
+
 	return &cfg, nil
 }
