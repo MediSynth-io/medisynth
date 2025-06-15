@@ -2,6 +2,16 @@
 
 {{define "content"}}
 <div class="space-y-6">
+    <!-- DEBUGGING -->
+    <div class="my-4 p-4 bg-red-100 border border-red-300 rounded">
+        <h3 class="font-bold text-red-800">Debug Info</h3>
+        <p>Order Status: <code>{{.Order.Status}}</code></p>
+        <p>Is Status Pending: <code>{{eq .Order.Status "pending"}}</code></p>
+        <p>BTC Address: <code>{{.Order.BTCAddress}}</code></p>
+        <p>Has BTC Address: <code>{{if .Order.BTCAddress}}true{{else}}false{{end}}</code></p>
+    </div>
+    <!-- END DEBUGGING -->
+    
     <!-- Back Button -->
     <div>
         <a href="/orders" class="text-blue-600 hover:text-blue-800 font-medium">

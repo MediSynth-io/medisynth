@@ -317,7 +317,12 @@ func (s *BitcoinService) GeneratePaymentQR(address string, amount float64, label
 
 // ProcessOrderPayment processes a new order with Bitcoin payment setup
 func (s *BitcoinService) ProcessOrderPayment(userID, description string, amountUSD float64, btcAddress string) (*models.Order, error) {
-	log.Printf("[BITCOIN] Processing order payment for user %s, amount: $%.2f", userID, amountUSD)
+	log.Printf("[BITCOIN] Processing order payment for user %s, amount: $%.2f, to address: %s", userID, amountUSD, btcAddress)
+
+	if btcAddress == "" {
+		log.Printf("[BITCOIN] ERROR: Bitcoin address is not configured. Cannot process order.")
+		return nil, fmt.Errorf("bitcoin address is not configured on the server")
+	}
 
 	// Convert USD to BTC
 	amountBTC, err := s.ConvertUSDToBTC(amountUSD)
@@ -344,11 +349,11 @@ func (s *BitcoinService) ProcessOrderPayment(userID, description string, amountU
 		// Continue anyway, order is created
 	}
 
-	// Refresh order data
+	// Refresh order data to get all fields populated
 	updatedOrder, err := database.GetOrderByID(order.ID, userID)
 	if err != nil {
-		log.Printf("[BITCOIN] Warning: Failed to get updated order: %v", err)
-		return order, nil // Return original order
+		log.Printf("[BITCOIN] Warning: Failed to get updated order details for user %s: %v", userID, err)
+		return order, nil // Return original order if refetch fails
 	}
 
 	log.Printf("[BITCOIN] Order %s processed successfully with %.8f BTC payment", order.OrderNumber, amountBTC)
