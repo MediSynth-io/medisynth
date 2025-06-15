@@ -122,5 +122,20 @@ function fillOrder(description, amount) {
     document.getElementById('description').value = description;
     document.getElementById('amount_usd').value = amount;
 }
+
+// Pre-fill form from URL parameters
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const amount = urlParams.get('amount');
+    const description = urlParams.get('description');
+    
+    if (amount) {
+        document.getElementById('amount_usd').value = amount;
+    }
+    
+    if (description) {
+        document.getElementById('description').value = decodeURIComponent(description);
+    }
+});
 </script>
 {{end}} 

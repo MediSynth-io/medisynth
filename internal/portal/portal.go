@@ -128,6 +128,7 @@ func (p *Portal) Routes() http.Handler {
 		r.Use(p.requireAuth)
 
 		r.Get("/dashboard", p.handleDashboard)
+		r.Get("/pricing", p.handlePricing)
 		r.Get("/documentation", p.handleDocumentation)
 		r.Handle("/swagger/*", http.HandlerFunc(p.handleSwaggerProxy))
 		r.Get("/jobs", p.handleJobs)

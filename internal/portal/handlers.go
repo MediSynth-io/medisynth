@@ -19,6 +19,67 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/models"
 )
 
+// getRealIP extracts the real client IP from request headers
+func getRealIP(r *http.Request) string {
+	// Check X-Forwarded-For header first (most common in load balancers)
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		// X-Forwarded-For can contain multiple IPs, take the first one
+		ips := strings.Split(xff, ",")
+		if len(ips) > 0 {
+			return strings.TrimSpace(ips[0])
+		}
+	}
+
+	// Check X-Real-IP header (used by some proxies)
+	xri := r.Header.Get("X-Real-IP")
+	if xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// Check CF-Connecting-IP (Cloudflare)
+	cfip := r.Header.Get("CF-Connecting-IP")
+	if cfip != "" {
+		return strings.TrimSpace(cfip)
+	}
+
+	// Fall back to RemoteAddr
+	ip := r.RemoteAddr
+	if colonIndex := strings.LastIndex(ip, ":"); colonIndex != -1 {
+		ip = ip[:colonIndex]
+	}
+	return ip
+}
+
+// getUserInfo gets user email and ID from request context for logging
+func getUserInfo(r *http.Request) (string, string) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		return "", ""
+	}
+
+	user, err := database.GetUserByID(userID)
+	if err != nil {
+		return userID, ""
+	}
+
+	return userID, user.Email
+}
+
+// logRequest logs request details with real IP and user info
+func logRequest(r *http.Request, action string, details ...interface{}) {
+	realIP := getRealIP(r)
+	userID, email := getUserInfo(r)
+
+	if email != "" {
+		log.Printf("[%s] %s - IP: %s, User: %s (%s) %v", action, r.Method+" "+r.URL.Path, realIP, email, userID, details)
+	} else if userID != "" {
+		log.Printf("[%s] %s - IP: %s, User ID: %s %v", action, r.Method+" "+r.URL.Path, realIP, userID, details)
+	} else {
+		log.Printf("[%s] %s - IP: %s %v", action, r.Method+" "+r.URL.Path, realIP, details)
+	}
+}
+
 func (p *Portal) handleLanding(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "landing.html", "MediSynth", map[string]interface{}{})
 }
@@ -174,25 +235,25 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	log.Printf("[PORTAL] Login attempt for email: %s", email)
+	logRequest(r, "LOGIN", "Login attempt for email:", email)
 
 	user, err := auth.ValidateUser(email, password)
 	if err != nil {
-		log.Printf("[PORTAL] User validation failed for %s: %v", email, err)
+		logRequest(r, "LOGIN", "User validation failed for", email, ":", err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Invalid email or password", "Email": email})
 		return
 	}
 
-	log.Printf("[PORTAL] User validation successful for %s (UserID: %s)", email, user.ID)
+	logRequest(r, "LOGIN", "User validation successful")
 
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		log.Printf("ERROR: Session creation failed for user %s: %v", user.ID, err)
+		logRequest(r, "LOGIN", "Session creation failed:", err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Failed to create session.", "Email": email})
 		return
 	}
 
-	log.Printf("[PORTAL] Session created successfully for user %s, token length: %d", user.ID, len(token))
+	logRequest(r, "LOGIN", "Session created successfully, token length:", len(token))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -205,7 +266,7 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	log.Printf("[PORTAL] Session cookie set for user %s, redirecting to dashboard", user.ID)
+	logRequest(r, "LOGIN", "Session cookie set, redirecting to dashboard")
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -214,7 +275,7 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
-	log.Printf("[PORTAL] Registration attempt for email: %s", email)
+	logRequest(r, "REGISTER", "Registration attempt for email:", email)
 
 	data := map[string]interface{}{
 		"Email":                email,
@@ -222,52 +283,52 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !auth.ValidateEmail(email) {
-		log.Printf("[PORTAL] Invalid email format: %s", email)
+		logRequest(r, "REGISTER", "Invalid email format:", email)
 		data["Error"] = "Please enter a valid email address"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	if password != confirmPassword {
-		log.Printf("[PORTAL] Password mismatch for email: %s", email)
+		logRequest(r, "REGISTER", "Password mismatch for email:", email)
 		data["Error"] = "Passwords do not match"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	if !auth.ValidatePassword(password) {
-		log.Printf("[PORTAL] Password validation failed for email: %s", email)
+		logRequest(r, "REGISTER", "Password validation failed for email:", email)
 		data["Error"] = "Password does not meet the requirements"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
-	log.Printf("[PORTAL] Attempting to register user: %s", email)
+	logRequest(r, "REGISTER", "Attempting to register user:", email)
 	user, err := auth.RegisterUser(email, password)
 	if err != nil {
-		log.Printf("[PORTAL] User registration failed for %s: %v", email, err)
+		logRequest(r, "REGISTER", "User registration failed for", email, ":", err)
 		if strings.Contains(err.Error(), "UNIQUE constraint") || strings.Contains(err.Error(), "duplicate key") {
 			data["Error"] = "This email is already registered."
 		} else {
 			data["Error"] = "Registration failed. Please try again later."
-			log.Printf("ERROR: Failed to register user %s: %v", email, err)
+			logRequest(r, "REGISTER", "ERROR: Failed to register user", email, ":", err)
 		}
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
-	log.Printf("[PORTAL] User registered successfully: %s (UserID: %s)", email, user.ID)
+	logRequest(r, "REGISTER", "User registered successfully")
 
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		log.Printf("ERROR: User %s registered but session creation failed: %v", email, err)
+		logRequest(r, "REGISTER", "User registered but session creation failed:", err)
 		// User is registered, but we can't log them in.
 		// Redirect to login with a message.
 		http.Redirect(w, r, "/login?info=registration_success", http.StatusSeeOther)
 		return
 	}
 
-	log.Printf("[PORTAL] Session created successfully for new user %s, token length: %d", user.ID, len(token))
+	logRequest(r, "REGISTER", "Session created successfully for new user, token length:", len(token))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -280,7 +341,7 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	log.Printf("[PORTAL] Registration complete for %s, redirecting to dashboard", email)
+	logRequest(r, "REGISTER", "Registration complete, redirecting to dashboard")
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -292,13 +353,12 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DASHBOARD] Rendering dashboard for user: %s", userID)
-	log.Printf("[DASHBOARD] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
+	logRequest(r, "DASHBOARD", "Rendering dashboard")
 
 	// Get API tokens count
 	tokens, err := database.GetUserTokens(userID)
 	if err != nil {
-		log.Printf("[DASHBOARD] Error getting tokens for user %s: %v", userID, err)
+		logRequest(r, "DASHBOARD", "Error getting tokens:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -306,7 +366,7 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Get job statistics
 	jobs, err := database.GetJobsByUserID(userID)
 	if err != nil {
-		log.Printf("[DASHBOARD] Error getting jobs for user %s: %v", userID, err)
+		logRequest(r, "DASHBOARD", "Error getting jobs:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -321,7 +381,7 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("[DASHBOARD] Found %d tokens, %d jobs, %d total patients for user %s", len(tokens), len(jobs), totalPatients, userID)
+	logRequest(r, "DASHBOARD", "Stats:", len(tokens), "tokens,", len(jobs), "jobs,", totalPatients, "patients")
 
 	data := struct {
 		APIRequests      int    `json:"apiRequests"`
@@ -342,6 +402,11 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "dashboard.html", "Dashboard", data)
 }
 
+func (p *Portal) handlePricing(w http.ResponseWriter, r *http.Request) {
+	logRequest(r, "PRICING", "Viewing pricing page")
+	p.renderTemplate(w, r, "pricing.html", "Pricing & Donations", nil)
+}
+
 func (p *Portal) handleTokens(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "tokens.html", "API Tokens", nil)
 }
@@ -351,17 +416,21 @@ func (p *Portal) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 
 	if name == "" {
+		logRequest(r, "TOKENS", "Token name is required")
 		http.Error(w, "Token name is required", http.StatusBadRequest)
 		return
 	}
 
+	logRequest(r, "TOKENS", "Creating token with name:", name)
+
 	token, err := auth.CreateToken(userID, name)
 	if err != nil {
-		log.Printf("Error creating token: %v", err)
+		logRequest(r, "TOKENS", "Error creating token:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	logRequest(r, "TOKENS", "Token created successfully")
 	// Redirect to tokens page with the new token value in the query string
 	http.Redirect(w, r, "/tokens?new_token="+token.Token, http.StatusSeeOther)
 }
@@ -370,21 +439,27 @@ func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(string)
 	tokenID := chi.URLParam(r, "id")
 	if tokenID == "" {
+		logRequest(r, "TOKENS", "Token ID required for deletion")
 		http.Error(w, "Token ID required", http.StatusBadRequest)
 		return
 	}
 
+	logRequest(r, "TOKENS", "Deleting token:", tokenID)
+
 	err := auth.DeleteToken(userID, tokenID)
 	if err != nil {
-		log.Printf("Error deleting token: %v", err)
+		logRequest(r, "TOKENS", "Error deleting token", tokenID, ":", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
+	logRequest(r, "TOKENS", "Token deleted successfully:", tokenID)
 	http.Redirect(w, r, "/tokens", http.StatusSeeOther)
 }
 
 func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
+	logRequest(r, "LOGOUT", "User logged out")
+
 	cookie, err := r.Cookie("session")
 	if err == nil {
 		auth.DeleteSession(cookie.Value)
@@ -410,12 +485,11 @@ func (p *Portal) handleJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[JOBS] Rendering jobs for user: %s", userID)
-	log.Printf("[JOBS] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
+	logRequest(r, "JOBS", "Rendering jobs list")
 
 	jobs, err := database.GetJobsByUserID(userID)
 	if err != nil {
-		log.Printf("[JOBS] Error getting jobs for user %s: %v", userID, err)
+		logRequest(r, "JOBS", "Error getting jobs:", err)
 		http.Error(w, "Could not retrieve job history.", http.StatusInternalServerError)
 		return
 	}
@@ -684,11 +758,11 @@ func (p *Portal) handleUserOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[ORDERS] Rendering orders for user: %s", userID)
+	logRequest(r, "ORDERS", "Viewing orders list")
 
 	orders, err := database.GetUserOrders(userID)
 	if err != nil {
-		log.Printf("[ORDERS] Error getting orders for user %s: %v", userID, err)
+		logRequest(r, "ORDERS", "Error getting orders:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -713,11 +787,11 @@ func (p *Portal) handleOrderDetails(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[ORDERS] Getting order details for order %s, user %s", orderID, userID)
+	logRequest(r, "ORDERS", "Viewing order details for:", orderID)
 
 	order, err := database.GetOrderByID(orderID, userID)
 	if err != nil {
-		log.Printf("[ORDERS] Error getting order %s: %v", orderID, err)
+		logRequest(r, "ORDERS", "Error getting order", orderID+":", err)
 		if err == sql.ErrNoRows {
 			http.Error(w, "Order not found", http.StatusNotFound)
 		} else {
@@ -740,38 +814,42 @@ func (p *Portal) handleCreateUserOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[ORDERS] Creating new order for user: %s", userID)
+	logRequest(r, "ORDERS", "Creating new order")
 
 	// Parse form data
 	description := r.FormValue("description")
 	amountUSD := r.FormValue("amount_usd")
 
 	if description == "" || amountUSD == "" {
+		logRequest(r, "ORDERS", "Missing required fields")
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
 		return
 	}
 
 	amount, err := strconv.ParseFloat(amountUSD, 64)
 	if err != nil {
+		logRequest(r, "ORDERS", "Invalid amount:", amountUSD)
 		http.Error(w, "Invalid amount", http.StatusBadRequest)
 		return
 	}
+
+	logRequest(r, "ORDERS", "Processing payment for $"+amountUSD)
 
 	// Use Bitcoin service to process the order with payment setup
 	bitcoinService := bitcoin.NewBitcoinService()
 	order, err := bitcoinService.ProcessOrderPayment(userID, description, amount, p.config.BitcoinAddress)
 	if err != nil {
-		log.Printf("[ORDERS] Error creating order: %v", err)
+		logRequest(r, "ORDERS", "Error creating order:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("[ORDERS] Created order %s for user %s", order.OrderNumber, userID)
+	logRequest(r, "ORDERS", "Created order", order.OrderNumber, "successfully")
 	http.Redirect(w, r, "/orders/"+order.ID, http.StatusSeeOther)
 }
 
 func (p *Portal) handleCreateOrderForm(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[ORDERS] Showing order creation form")
+	logRequest(r, "ORDERS", "Showing order creation form")
 	p.renderTemplate(w, r, "create-order.html", "Create Order", nil)
 }
 

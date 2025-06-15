@@ -1,0 +1,210 @@
+{{define "title"}}Pricing & Donations{{end}}
+
+{{define "content"}}
+<div class="bg-gradient-to-br from-indigo-50 via-white to-purple-50 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-900 mb-4">Support MediSynth Development</h1>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Help us maintain and improve this open-source synthetic medical data platform. 
+                Your donations keep the service running for everyone.
+            </p>
+        </div>
+
+        <!-- Important Notice -->
+        <div class="max-w-4xl mx-auto mb-8">
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-6">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-lg font-medium text-amber-800">Important: No Service Guarantees</h3>
+                        <div class="mt-2 text-sm text-amber-700">
+                            <p class="mb-2">
+                                <strong>This service is provided on a donation basis.</strong> Any payments or donations made do not include any guarantees regarding:
+                            </p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>Service availability or uptime</li>
+                                <li>Data generation quality or accuracy</li>
+                                <li>Support response times</li>
+                                <li>Feature development or bug fixes</li>
+                                <li>Continued operation of the service</li>
+                            </ul>
+                            <p class="mt-2">
+                                <strong>Use at your own risk.</strong> Donations are appreciated but voluntary and do not create any obligation or warranty.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Donation Options -->
+        <div class="max-w-5xl mx-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                <!-- Small Donation -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 hover:shadow-xl transition-shadow">
+                    <div class="text-center">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Coffee ☕</h3>
+                        <div class="text-4xl font-bold text-indigo-600 mb-4">$5</div>
+                        <p class="text-gray-600 mb-6">Help cover basic server costs</p>
+                        <a href="/orders/create?amount=5.00&description=Coffee%20Donation%20-%20Basic%20Support" 
+                           class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+                            Donate with Bitcoin
+                        </a>
+                        <div class="mt-4 text-xs text-gray-500">
+                            One-time donation<br/>
+                            No guarantees included
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medium Donation -->
+                <div class="bg-white rounded-xl shadow-lg border-2 border-indigo-500 p-8 hover:shadow-xl transition-shadow relative">
+                    <div class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+                        <span class="bg-indigo-500 text-white px-4 py-1 rounded-full text-sm font-medium">Popular</span>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Pizza 🍕</h3>
+                        <div class="text-4xl font-bold text-indigo-600 mb-4">$25</div>
+                        <p class="text-gray-600 mb-6">Support development efforts</p>
+                        <a href="/orders/create?amount=25.00&description=Pizza%20Donation%20-%20Development%20Support" 
+                           class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+                            Donate with Bitcoin
+                        </a>
+                        <div class="mt-4 text-xs text-gray-500">
+                            One-time donation<br/>
+                            No guarantees included
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Large Donation -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 hover:shadow-xl transition-shadow">
+                    <div class="text-center">
+                        <h3 class="text-2xl font-bold text-gray-900 mb-2">Dinner 🍽️</h3>
+                        <div class="text-4xl font-bold text-indigo-600 mb-4">$100</div>
+                        <p class="text-gray-600 mb-6">Significant platform support</p>
+                        <a href="/orders/create?amount=100.00&description=Dinner%20Donation%20-%20Platform%20Support" 
+                           class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+                            Donate with Bitcoin
+                        </a>
+                        <div class="mt-4 text-xs text-gray-500">
+                            One-time donation<br/>
+                            No guarantees included
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Amount -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-12">
+                <div class="text-center">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Custom Amount</h3>
+                    <p class="text-gray-600 mb-6">Choose your own donation amount</p>
+                    <a href="/orders/create" 
+                       class="inline-flex items-center bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium py-3 px-6 rounded-lg transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                        </svg>
+                        Create Custom Donation
+                    </a>
+                </div>
+            </div>
+
+            <!-- Why Donate -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-8 mb-12">
+                <h3 class="text-2xl font-bold text-gray-900 mb-6 text-center">Why Support MediSynth?</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="space-y-6">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12l5 5L20 7"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h4 class="font-semibold text-gray-900">Server Costs</h4>
+                                <p class="text-gray-600 text-sm">Keep the API and services running 24/7</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h4 class="font-semibold text-gray-900">Development Time</h4>
+                                <p class="text-gray-600 text-sm">Fund continued feature development</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h4 class="font-semibold text-gray-900">Quality Improvements</h4>
+                                <p class="text-gray-600 text-sm">Enhance data generation algorithms</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-6">
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h4 class="font-semibold text-gray-900">Open Source</h4>
+                                <p class="text-gray-600 text-sm">Keep the platform free and accessible</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h4 class="font-semibold text-gray-900">Research Support</h4>
+                                <p class="text-gray-600 text-sm">Enable healthcare innovation</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start">
+                            <div class="flex-shrink-0 w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <h4 class="font-semibold text-gray-900">Community</h4>
+                                <p class="text-gray-600 text-sm">Support the healthcare data community</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Information -->
+            <div class="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+                <h3 class="text-lg font-semibold text-gray-900 mb-4">Payment Information</h3>
+                <div class="max-w-2xl mx-auto text-sm text-gray-600 space-y-2">
+                    <p>• All donations are processed via <strong>Bitcoin</strong> for privacy and security</p>
+                    <p>• Payments are <strong>non-refundable</strong> as they are voluntary donations</p>
+                    <p>• You will receive a Bitcoin QR code and payment instructions</p>
+                    <p>• No personal data is stored with payment information</p>
+                    <p>• <strong>Remember:</strong> Donations do not guarantee any level of service</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}} 
