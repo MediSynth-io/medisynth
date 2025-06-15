@@ -11,7 +11,6 @@ import (
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
-	"github.com/MediSynth-io/medisynth/internal/portal"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -19,7 +18,6 @@ import (
 
 type Api struct {
 	Config config.Config
-	portal *portal.Portal
 	Router *chi.Mux
 }
 
@@ -28,41 +26,16 @@ func NewApi(cfg config.Config) (*Api, error) {
 		Config: cfg,
 		Router: chi.NewRouter(),
 	}
-
-	// Initialize other components like portal if necessary
-	// portal, err := portal.New(&cfg)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// api.portal = portal
-
 	api.setupRoutes()
 	return api, nil
 }
 
 func (api *Api) setupRoutes() {
 	r := api.Router
+
+	// Middleware
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Heartbeat("/heartbeat"))
-
-	// Public routes
-	r.Post("/register", api.RegisterHandler)
-	r.Post("/login", api.LoginHandler)
-
-	// Protected routes for token management
-	r.Group(func(r chi.Router) {
-		r.Use(api.TokenAuthMiddleware)
-		r.Post("/tokens", api.CreateTokenHandler)
-		r.Get("/tokens", api.ListTokensHandler)
-		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
-	})
-}
-
-func (api *Api) Serve() {
-	r := chi.NewRouter()
-
-	// Add CORS middleware before other middleware
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://*.local:*", "http://localhost:*", "http://127.0.0.1:*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -72,108 +45,47 @@ func (api *Api) Serve() {
 		MaxAge:           300,
 	}))
 
-	// Middleware
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-
-	// Add a simple, standalone ping route for debugging
+	// Public routes
+	r.Get("/heartbeat", api.Heartbeat)
 	r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("pong"))
 	})
-
-	// Custom NotFound handler for debugging
-	r.NotFound(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("CHI ROUTER - NOT FOUND: Path='%s', RawQuery='%s'", r.URL.Path, r.URL.RawQuery)
-
-		// Don't redirect if we're already on the portal domain
-		if r.Host == api.Config.Domains.Portal {
-			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
-			return
-		}
-
-		// Don't redirect API endpoints
-		if strings.HasPrefix(r.URL.Path, "/auth/") || r.URL.Path == "/heartbeat" {
-			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
-			return
-		}
-
-		// For non-API paths on api domain, redirect to portal
-		if r.Host == api.Config.Domains.API {
-			scheme := "http"
-			if api.Config.Domains.Secure {
-				scheme = "https"
-			}
-			portalURL := fmt.Sprintf("%s://%s:%d%s", scheme, api.Config.Domains.Portal, api.Config.APIPort, r.URL.Path)
-			http.Redirect(w, r, portalURL, http.StatusSeeOther)
-		} else {
-			http.Error(w, fmt.Sprintf("Custom 404 - Path Not Found: %s", r.URL.Path), http.StatusNotFound)
-		}
-	})
-
-	// Mount routes based on domain
-	r.Group(func(r chi.Router) {
-		r.Use(DomainMiddleware(api.portal.Routes(), api.Routes(), &api.Config))
-	})
-
-	// Serve the swagger-ui and the spec
-	r.Handle("/swagger/*", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swagger-ui"))))
-
-	// Auth routes
 	r.Post("/register", api.RegisterHandler)
 	r.Post("/login", api.LoginHandler)
 
-	// Protected routes for token management
+	// Protected API routes
 	r.Group(func(r chi.Router) {
 		r.Use(api.TokenAuthMiddleware)
 		r.Post("/tokens", api.CreateTokenHandler)
 		r.Get("/tokens", api.ListTokensHandler)
 		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
+		r.Post("/generate-patients", api.RunSyntheaGeneration)
+		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
 	})
 
-	// Add a simple heartbeat endpoint
-	r.Get("/heartbeat", api.Heartbeat)
+	// Swagger UI
+	r.Handle("/swagger/*", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swagger-ui"))))
+}
 
+func (api *Api) Serve() {
 	// Start session cleanup goroutine
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for {
-			err := auth.CleanupExpiredSessions()
-			if err != nil {
-				log.Printf("Error cleaning up expired sessions: %v", err)
+			select {
+			case <-ticker.C:
+				err := auth.CleanupExpiredSessions()
+				if err != nil {
+					log.Printf("Error cleaning up expired sessions: %v", err)
+				}
 			}
-			<-ticker.C
 		}
 	}()
 
 	log.Printf("Starting API server on 0.0.0.0:%d", api.Config.APIPort)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", api.Config.APIPort), r))
-}
-
-func (api *Api) Routes() http.Handler {
-	apiRoutes := chi.NewRouter()
-	apiRoutes.Get("/heartbeat", api.Heartbeat)
-	apiRoutes.Post("/auth/register", auth.RegisterHandler)
-	apiRoutes.Post("/auth/login", auth.LoginHandler)
-
-	// Protected routes
-	apiRoutes.Group(func(r chi.Router) {
-		r.Use(auth.AuthMiddleware(auth.GetTokenManager()))
-		r.Use(auth.RequireAuth)
-
-		// Token management
-		r.Post("/auth/tokens", auth.CreateTokenHandler)
-		r.Get("/auth/tokens", auth.ListTokensHandler)
-		r.Delete("/auth/tokens/{id}", auth.DeleteTokenHandler)
-
-		// API routes
-		r.Post("/generate-patients", api.RunSyntheaGeneration)
-		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
-	})
-	return apiRoutes
+	log.Fatal(http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", api.Config.APIPort), api.Router))
 }
 
 func DomainMiddleware(portalHandler, apiHandler http.Handler, config *config.Config) func(http.Handler) http.Handler {
