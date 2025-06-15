@@ -110,6 +110,7 @@ jobs:
         with:
           method: kubeconfig
           kubeconfig: ${{ secrets.KUBE_CONFIG }}
+          cluster-type: generic
 
       - name: Rollout API deployment
         if: needs.changes.outputs.api == 'true'
