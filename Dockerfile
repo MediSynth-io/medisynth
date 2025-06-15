@@ -1,5 +1,5 @@
-# Use Go 1.21.1 for both build and runtime
-FROM golang:1.21.1
+# Use Go 1.23 for both build and runtime
+FROM golang:1.23
 
 WORKDIR /app
 
@@ -25,4 +25,4 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 EXPOSE 8081
 
 # Run the appropriate application based on the SERVICE_TYPE environment variable
-CMD ["sh", "-c", "if [ \"$SERVICE_TYPE\" = \"portal\" ]; then if [ \"$MEDISYNTH_ENV\" = \"prod\" ]; then ./medisynth-portal -config app.prod.yml; else ./medisynth-portal -config app.yml; fi; else if [ \"$MEDISYNTH_ENV\" = \"prod\" ]; then ./medisynth-api -config app.prod.yml; else ./medisynth-api -config app.yml; fi; fi"]
+CMD ["sh", "-c", "if [ \"$SERVICE_TYPE\" = \"portal\" ]; then if [ \"$MEDISYNTH_ENV\" = \"prod\" ]; then ./medisynth-portal -config app.prod.yml; else ./medisynth-portal -config app.dev.yml; fi; else if [ \"$MEDISYNTH_ENV\" = \"prod\" ]; then ./medisynth-api -config app.prod.yml; else ./medisynth-api -config app.dev.yml; fi; fi"]
