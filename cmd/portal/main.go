@@ -34,8 +34,8 @@ func initializePortal() (http.Handler, error) {
 	if cfg.BitcoinAddress != "" {
 		log.Printf("Initializing Bitcoin payment monitoring for address: %s", cfg.BitcoinAddress)
 		bitcoinService := bitcoin.NewBitcoinService()
-		// Check every 2 minutes for payments
-		bitcoinService.StartMonitoring(cfg.BitcoinAddress, 2*time.Minute)
+		// Check every 180 seconds (3 minutes) for payments
+		bitcoinService.StartMonitoring(cfg.BitcoinAddress, 180*time.Second)
 		log.Printf("Bitcoin payment monitoring started successfully")
 	} else {
 		log.Printf("No Bitcoin address configured, skipping payment monitoring")
