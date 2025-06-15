@@ -47,23 +47,18 @@ func New(cfg *config.Config) (*Portal, error) {
 		return nil, err
 	}
 
-	baseTmpl := template.New("base.html").Funcs(funcMap)
-	baseTmpl, err = baseTmpl.ParseFiles(filepath.Join(templateDir, "base.html"))
-	if err != nil {
-		return nil, err
-	}
-
 	for _, page := range pages {
-		if page == "base.html" {
+		if page == "base.html" || page == "admin-base.html" {
 			continue
 		}
 
-		tmpl, err := baseTmpl.Clone()
-		if err != nil {
-			return nil, err
-		}
-
-		tmpl, err = tmpl.ParseFiles(filepath.Join(templateDir, page))
+		// All pages now get parsed with both base templates
+		// The handlers will decide which one to execute.
+		tmpl, err := template.New(page).Funcs(funcMap).ParseFiles(
+			filepath.Join(templateDir, "base.html"),
+			filepath.Join(templateDir, "admin-base.html"),
+			filepath.Join(templateDir, page),
+		)
 		if err != nil {
 			log.Printf("Error parsing template %s: %v", page, err)
 			return nil, err
