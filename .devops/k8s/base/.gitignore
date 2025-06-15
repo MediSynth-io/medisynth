@@ -1,2 +1,11 @@
 # Ignore local secrets file
-.env.secrets 
+.env.secrets
+
+# PostgreSQL credentials and secrets - DO NOT COMMIT!
+postgres-app-secret.yaml
+*postgres*credentials*.yaml
+*postgres*secret*.yaml
+
+# Other sensitive Kubernetes manifests
+*secret*.yaml
+*credentials*.yaml 

@@ -1,1 +1,23 @@
 cmd/api/medisynth-api
+
+# Database credentials and secrets
+.devops/k8s/base/postgres-app-secret.yaml
+*postgres*credentials*.yaml
+*postgres*secret*.yaml
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+.env.staging
+
+# Database files
+*.db
+*.db-*
+data/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo

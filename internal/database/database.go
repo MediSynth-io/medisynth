@@ -10,6 +10,7 @@ import (
 
 	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/MediSynth-io/medisynth/internal/models"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -21,28 +22,23 @@ func Init(cfg *config.Config) error {
 		return nil
 	}
 
-	log.Printf("Initializing database at path: %s", cfg.DatabasePath)
+	log.Printf("=== DATABASE INITIALIZATION DEBUG ===")
+	log.Printf("Database type: %s", cfg.DatabaseType)
 
-	// Ensure data directory exists
-	dataDir := filepath.Dir(cfg.DatabasePath)
-	log.Printf("Ensuring data directory exists: %s", dataDir)
+	var db *sql.DB
+	var err error
 
-	if err := createDataDir(dataDir); err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+	switch cfg.DatabaseType {
+	case "postgres":
+		db, err = initPostgreSQL(cfg)
+	case "sqlite", "":
+		db, err = initSQLite(cfg)
+	default:
+		return fmt.Errorf("unsupported database type: %s", cfg.DatabaseType)
 	}
 
-	// Check if we can write to the directory
-	if err := checkWritePermissions(dataDir); err != nil {
-		return fmt.Errorf("insufficient permissions for data directory %s: %w", dataDir, err)
-	}
-
-	// Open database connection
-	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_foreign_keys=on", cfg.DatabasePath)
-	log.Printf("Opening database connection with DSN: %s", dsn)
-
-	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
-		return fmt.Errorf("failed to open database: %v", err)
+		return err
 	}
 
 	// Test the connection
@@ -51,16 +47,104 @@ func Init(cfg *config.Config) error {
 		return fmt.Errorf("failed to ping database: %v", err)
 	}
 
+	// Check existing data BEFORE schema initialization
+	log.Printf("Checking existing database contents...")
+	if err := debugExistingData(db); err != nil {
+		log.Printf("Warning: Could not check existing data: %v", err)
+	}
+
 	// Initialize schema
 	log.Printf("Initializing database schema")
-	if err = initSchema(db); err != nil {
+	if err = initSchema(db, cfg.DatabaseType); err != nil {
 		db.Close()
 		return fmt.Errorf("failed to initialize schema: %v", err)
 	}
 
+	// Check data AFTER schema initialization
+	log.Printf("Checking database contents after schema init...")
+	if err := debugExistingData(db); err != nil {
+		log.Printf("Warning: Could not check data after init: %v", err)
+	}
+
 	dbConn = db
-	log.Printf("Database initialized successfully at %s", cfg.DatabasePath)
+	log.Printf("=== DATABASE INITIALIZED SUCCESSFULLY ===")
 	return nil
+}
+
+// initPostgreSQL initializes PostgreSQL connection
+func initPostgreSQL(cfg *config.Config) (*sql.DB, error) {
+	log.Printf("Initializing PostgreSQL connection...")
+	log.Printf("Host: %s, Port: %s, Database: %s, User: %s",
+		cfg.DatabaseHost, cfg.DatabasePort, cfg.DatabaseName, cfg.DatabaseUser)
+
+	// Build connection string
+	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		cfg.DatabaseHost,
+		cfg.DatabasePort,
+		cfg.DatabaseUser,
+		cfg.DatabasePassword,
+		cfg.DatabaseName,
+		cfg.DatabaseSSLMode,
+	)
+
+	log.Printf("Connecting to PostgreSQL...")
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open PostgreSQL connection: %v", err)
+	}
+
+	// Configure connection pool
+	if cfg.DatabaseMaxConns > 0 {
+		db.SetMaxOpenConns(cfg.DatabaseMaxConns)
+	}
+	if cfg.DatabaseMaxIdle > 0 {
+		db.SetMaxIdleConns(cfg.DatabaseMaxIdle)
+	}
+	if cfg.DatabaseConnMaxLifetime != "" && cfg.DatabaseConnMaxLifetime != "0" {
+		if duration, err := time.ParseDuration(cfg.DatabaseConnMaxLifetime); err == nil {
+			db.SetConnMaxLifetime(duration)
+		}
+	}
+
+	log.Printf("PostgreSQL connection configured successfully")
+	return db, nil
+}
+
+// initSQLite initializes SQLite connection
+func initSQLite(cfg *config.Config) (*sql.DB, error) {
+	log.Printf("Initializing SQLite connection at path: %s", cfg.DatabasePath)
+
+	// Check if database file exists before we open it
+	if stat, err := os.Stat(cfg.DatabasePath); err == nil {
+		log.Printf("Database file EXISTS - Size: %d bytes, Modified: %v", stat.Size(), stat.ModTime())
+	} else {
+		log.Printf("Database file does NOT exist yet: %v", err)
+	}
+
+	// Ensure data directory exists
+	dataDir := filepath.Dir(cfg.DatabasePath)
+	log.Printf("Ensuring data directory exists: %s", dataDir)
+
+	if err := createDataDir(dataDir); err != nil {
+		return nil, fmt.Errorf("failed to create data directory: %w", err)
+	}
+
+	// Check if we can write to the directory
+	if err := checkWritePermissions(dataDir); err != nil {
+		return nil, fmt.Errorf("insufficient permissions for data directory %s: %w", dataDir, err)
+	}
+
+	// Open database connection
+	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_foreign_keys=on", cfg.DatabasePath)
+	log.Printf("Opening SQLite database with DSN: %s", dsn)
+
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open SQLite database: %v", err)
+	}
+
+	log.Printf("SQLite connection opened successfully")
+	return db, nil
 }
 
 // GetConnection returns the database connection
@@ -69,44 +153,93 @@ func GetConnection() *sql.DB {
 }
 
 // initSchema creates the database schema if it doesn't exist
-func initSchema(db *sql.DB) error {
-	queries := []string{
-		`CREATE TABLE IF NOT EXISTS users (
-			id TEXT PRIMARY KEY,
-			email TEXT UNIQUE NOT NULL,
-			password TEXT NOT NULL,
-			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL
-		)`,
-		`CREATE TABLE IF NOT EXISTS tokens (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL,
-			token TEXT UNIQUE NOT NULL,
-			name TEXT NOT NULL,
-			created_at DATETIME NOT NULL,
-			expires_at DATETIME,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`CREATE TABLE IF NOT EXISTS sessions (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL,
-			token TEXT UNIQUE NOT NULL,
-			created_at DATETIME NOT NULL,
-			expires_at DATETIME NOT NULL,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
-		`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`,
+func initSchema(db *sql.DB, dbType string) error {
+	var queries []string
+
+	if dbType == "postgres" {
+		// PostgreSQL schema with UUIDs and proper types
+		queries = []string{
+			`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`,
+			`CREATE TABLE IF NOT EXISTS users (
+				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+				email VARCHAR(255) UNIQUE NOT NULL,
+				password VARCHAR(255) NOT NULL,
+				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+				updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+			)`,
+			`CREATE TABLE IF NOT EXISTS tokens (
+				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+				user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				token VARCHAR(255) UNIQUE NOT NULL,
+				name VARCHAR(255) NOT NULL,
+				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+				expires_at TIMESTAMP WITH TIME ZONE,
+				CONSTRAINT fk_tokens_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)`,
+			`CREATE TABLE IF NOT EXISTS sessions (
+				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+				user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				token VARCHAR(255) UNIQUE NOT NULL,
+				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+				expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+				CONSTRAINT fk_sessions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
+			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_tokens_token ON tokens(token)`,
+			`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`,
+			`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`,
+		}
+	} else {
+		// SQLite schema (original)
+		queries = []string{
+			`CREATE TABLE IF NOT EXISTS users (
+				id TEXT PRIMARY KEY,
+				email TEXT UNIQUE NOT NULL,
+				password TEXT NOT NULL,
+				created_at DATETIME NOT NULL,
+				updated_at DATETIME NOT NULL
+			)`,
+			`CREATE TABLE IF NOT EXISTS tokens (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				name TEXT NOT NULL,
+				created_at DATETIME NOT NULL,
+				expires_at DATETIME,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)`,
+			`CREATE TABLE IF NOT EXISTS sessions (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				created_at DATETIME NOT NULL,
+				expires_at DATETIME NOT NULL,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)`,
+			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
+			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`,
+		}
 	}
 
 	for _, query := range queries {
+		log.Printf("Executing schema query: %s", query[:min(len(query), 80)]+"...")
 		if _, err := db.Exec(query); err != nil {
 			return fmt.Errorf("failed to execute schema query: %v", err)
 		}
 	}
 	return nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // createDataDir ensures the data directory exists with proper permissions
@@ -330,4 +463,25 @@ func CleanupExpiredSessions() error {
 // generateID generates a unique ID
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+// debugExistingData checks and logs existing database contents
+func debugExistingData(db *sql.DB) error {
+	// Check if tables exist
+	tables := []string{"users", "tokens", "sessions"}
+	for _, table := range tables {
+		var count int
+		query := fmt.Sprintf("SELECT COUNT(*) FROM %s", table)
+		err := db.QueryRow(query).Scan(&count)
+		if err != nil {
+			if err.Error() == "no such table: "+table {
+				log.Printf("Table '%s' does not exist yet", table)
+			} else {
+				log.Printf("Error checking table '%s': %v", table, err)
+			}
+		} else {
+			log.Printf("Table '%s' has %d records", table, count)
+		}
+	}
+	return nil
 }

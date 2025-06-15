@@ -16,8 +16,6 @@ spec:
     spec:
       imagePullSecrets:
         - name: ghcr-login-secret
-      securityContext:
-        fsGroup: 1000
       containers:
         - name: medisynth-api
           image: ghcr.io/medisynth-io/medisynth-api:latest
@@ -44,9 +42,6 @@ spec:
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5
-          volumeMounts:
-            - name: sqlite-data
-              mountPath: /data
           envFrom:
             - configMapRef:
                 name: medisynth-api-config
@@ -54,42 +49,8 @@ spec:
                 name: medisynth-secrets
             - secretRef:
                 name: medisynth-s3-credentials
+            - secretRef:
+                name: medisynth-postgres-app-credentials
           securityContext:
             runAsUser: 1000
             runAsGroup: 1000
-      initContainers:
-        - name: init-db
-          image: alpine:latest
-          command: 
-            - sh
-            - -c
-            - |
-              echo "Setting up database directory and permissions..."
-              
-              # Create the data directory if it doesn't exist
-              mkdir -p /data
-              
-              # Set proper ownership and permissions
-              chown -R 1000:1000 /data
-              chmod -R 755 /data
-              
-              # Create the database file if it doesn't exist
-              if [ ! -f /data/medisynth.db ]; then
-                echo "Creating database file..."
-                touch /data/medisynth.db
-                chown 1000:1000 /data/medisynth.db
-                chmod 644 /data/medisynth.db
-              fi
-              
-              # Verify permissions
-              ls -la /data/
-              echo "Database initialization complete"
-          volumeMounts:
-            - name: sqlite-data
-              mountPath: /data
-          securityContext:
-            runAsUser: 0
-      volumes:
-        - name: sqlite-data
-          persistentVolumeClaim:
-            claimName: medisynth-sqlite-pvc
