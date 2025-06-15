@@ -34,9 +34,9 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: medisynth-portal-svc
+            name: medisynth-portal-service
             port:
-              name: portal-http
+              name: http
   - host: medisynth.io
     http:
       paths:
@@ -44,6 +44,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: medisynth-portal-svc
+            name: medisynth-portal-service
             port:
-              name: portal-http
+              name: http
