@@ -10,5 +10,4 @@ WORKDIR /app
 COPY --from=builder /app/medisynth-portal /app/medisynth-portal
 COPY templates/ /app/templates/
 COPY static/ /app/static/
-COPY app.yml app.prod.yml ./
 CMD ["./medisynth-portal"] 

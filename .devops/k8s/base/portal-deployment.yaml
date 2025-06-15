@@ -22,13 +22,19 @@ spec:
           ports:
             - containerPort: 8082
               name: http
-          env:
-            - name: CONFIG_PATH
-              value: "/app/app.prod.yml"
+          envFrom:
+            - configMapRef:
+                name: medisynth-config
+            - secretRef:
+                name: medisynth-secrets
           resources:
             requests:
               memory: "128Mi"
               cpu: "50m"
             limits:
               memory: "256Mi"
-              cpu: "250m" 
+              cpu: "250m"
+      volumes:
+        - name: config
+          configMap:
+            name: medisynth-config

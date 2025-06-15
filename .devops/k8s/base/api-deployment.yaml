@@ -44,25 +44,18 @@ spec:
           volumeMounts:
             - name: sqlite-data
               mountPath: /data
-            - name: config
-              mountPath: /app
-          env:
-            - name: CONFIG_PATH
-              value: "/app/app.prod.yml"
-            - name: DB_PATH
-              value: /data/medisynth.db
-            - name: MEDISYNTH_SESSION_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: medisynth-secrets
-                  key: session-secret
+          envFrom:
+            - configMapRef:
+                name: medisynth-config
+            - secretRef:
+                name: medisynth-secrets
           securityContext:
             runAsUser: 1000
             runAsGroup: 1000
       initContainers:
         - name: init-db
           image: keinos/sqlite3
-          command: ["sh", "-c", "mkdir -p /data && touch /data/medisynth.db && sqlite3 /data/medisynth.db 'PRAGMA journal_mode=WAL;' && chmod 777 /data/medisynth.db && chmod 777 /data"]
+          command: ["sh", "-c", "mkdir -p /data && touch /data/medisynth.db && sqlite3 /data/medisynth.db 'PRAGMA journal_mode=WAL;' && chown -R 1000:1000 /data"]
           volumeMounts:
             - name: sqlite-data
               mountPath: /data

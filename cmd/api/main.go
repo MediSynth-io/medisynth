@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"log"
 
 	"github.com/MediSynth-io/medisynth/internal/api"
@@ -13,9 +12,9 @@ import (
 
 const version = "0.0.1"
 
-func initializeAPI(configPath string) (*api.Api, error) {
+func initializeAPI() (*api.Api, error) {
 	// Load configuration
-	cfg, err := config.LoadConfig(configPath)
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -41,12 +40,9 @@ func initializeAPI(configPath string) (*api.Api, error) {
 }
 
 func main() {
-	configPath := flag.String("config", "", "Path to configuration file")
-	flag.Parse()
+	log.Printf("Starting MediSynth API v%s", version)
 
-	log.Printf("Starting MediSynth API v%s with config: %s", version, *configPath)
-
-	api, err := initializeAPI(*configPath)
+	api, err := initializeAPI()
 	if err != nil {
 		log.Fatal(err)
 	}

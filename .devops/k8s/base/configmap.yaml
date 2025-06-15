@@ -4,15 +4,10 @@ metadata:
   name: medisynth-config
   namespace: medisynth-io
 data:
-  app.prod.yml: |
-    apiPort: 8081
-    database:
-      path: /data/medisynth.db
-      socketPath: /data/sqlite.sock
-      walMode: true
-      maxRetries: 5
-      retryDelay: 5
-    domains:
-      portal: portal.medisynth.io
-      api: api.medisynth.io
-      secure: true
+  API_PORT: "8081"
+  DB_PATH: "/data/medisynth.db"
+  DOMAIN_PORTAL: "portal.medisynth.io"
+  DOMAIN_API: "api.medisynth.io"
+  DOMAIN_SECURE: "true"
+  API_URL: "https://api.medisynth.io"
+  API_INTERNAL_URL: "http://medisynth-api-svc:8081"

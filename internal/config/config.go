@@ -2,116 +2,53 @@ package config
 
 import (
 	"log"
-	"os"
 	"strings"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	APIPort        int    `yaml:"apiPort"`
-	APIURL         string `yaml:"apiURL"`
-	APIInternalURL string `yaml:"apiInternalURL"`
+	APIPort        int    `mapstructure:"API_PORT"`
+	APIURL         string `mapstructure:"API_URL"`
+	APIInternalURL string `mapstructure:"API_INTERNAL_URL"`
 	Database       struct {
-		Path       string `yaml:"path"`
-		SocketPath string `yaml:"socketPath"`
-		WALMode    bool   `yaml:"walMode"`
-		MaxRetries int    `yaml:"maxRetries"`
-		RetryDelay int    `yaml:"retryDelay"`
-	} `yaml:"database"`
+		Path       string `mapstructure:"DB_PATH"`
+		SocketPath string `mapstructure:"DB_SOCKET_PATH"`
+		WALMode    bool   `mapstructure:"DB_WAL_MODE"`
+		MaxRetries int    `mapstructure:"DB_MAX_RETRIES"`
+		RetryDelay int    `mapstructure:"DB_RETRY_DELAY"`
+	} `mapstructure:"database"`
 	Domains struct {
-		Portal string `yaml:"portal"`
-		API    string `yaml:"api"`
-		Secure bool   `yaml:"secure"`
-	} `yaml:"domains"`
+		Portal string `mapstructure:"DOMAIN_PORTAL"`
+		API    string `mapstructure:"DOMAIN_API"`
+		Secure bool   `mapstructure:"DOMAIN_SECURE"`
+	} `mapstructure:"domains"`
 }
 
-// LoadConfig loads the configuration from file and environment variables.
-func LoadConfig(path string) (*Config, error) {
+// LoadConfig loads the configuration from environment variables.
+func LoadConfig() (*Config, error) {
 	v := viper.New()
-
-	// Set up config file handling
-	v.SetConfigFile(path)   // Use the full path to the config file
-	v.SetConfigType("yaml") // Set the config type to yaml
-	v.AutomaticEnv()        // Read in environment variables that match
+	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Try to read the config file
-	if err := v.ReadInConfig(); err != nil {
-		// If the file doesn't exist or is invalid, return an error
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, err
-		}
-		log.Printf("Warning: Could not read config file: %s. Using defaults or environment variables.", err)
-	}
+	// Set defaults
+	v.SetDefault("API_PORT", 8081)
+	v.SetDefault("DB_PATH", "/data/medisynth.db")
+	v.SetDefault("DB_SOCKET_PATH", "/data/sqlite.sock")
+	v.SetDefault("DB_WAL_MODE", true)
+	v.SetDefault("DB_MAX_RETRIES", 5)
+	v.SetDefault("DB_RETRY_DELAY", 5)
+	v.SetDefault("DOMAIN_PORTAL", "portal.medisynth.io")
+	v.SetDefault("DOMAIN_API", "api.medisynth.io")
+	v.SetDefault("DOMAIN_SECURE", true)
+	v.SetDefault("API_URL", "https://api.medisynth.io")
+	v.SetDefault("API_INTERNAL_URL", "http://medisynth-api-svc:8081")
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, err
 	}
 
-	// Set default port if not specified
-	if cfg.APIPort == 0 {
-		cfg.APIPort = 8081 // Default port
-		log.Println("APIPort not specified, using default 8081")
-	}
-
-	// Set default database path if not specified
-	if cfg.Database.Path == "" {
-		cfg.Database.Path = "/data/medisynth.db"
-		log.Println("Database path not specified, using default /data/medisynth.db")
-	}
-
-	// Set default socket path if not specified
-	if cfg.Database.SocketPath == "" {
-		cfg.Database.SocketPath = "/data/sqlite.sock"
-		log.Println("Database socket path not specified, using default /data/sqlite.sock")
-	}
-
-	// Set default WAL mode
-	if !cfg.Database.WALMode {
-		cfg.Database.WALMode = true
-		log.Println("WAL mode not specified, enabling by default")
-	}
-
-	// Set default retry settings
-	if cfg.Database.MaxRetries == 0 {
-		cfg.Database.MaxRetries = 5
-	}
-	if cfg.Database.RetryDelay == 0 {
-		cfg.Database.RetryDelay = 5
-	}
-
-	// Set default domains if not specified
-	if cfg.Domains.Portal == "" {
-		cfg.Domains.Portal = "portal.medisynth.io" // Default to production domain
-		log.Println("Portal domain not specified, using default portal.medisynth.io")
-	}
-	if cfg.Domains.API == "" {
-		cfg.Domains.API = "api.medisynth.io" // Default to production domain
-		log.Println("API domain not specified, using default api.medisynth.io")
-	}
-
-	if cfg.APIURL == "" {
-		proto := "http"
-		if cfg.Domains.Secure {
-			proto = "https"
-		}
-		cfg.APIURL = proto + "://" + cfg.Domains.API
-	}
-
-	if cfg.APIInternalURL == "" {
-		cfg.APIInternalURL = "http://medisynth-api-svc:8081" // Default to k8s service name
-	}
-
-	// Only set secure default if it wasn't specified in the config file
-	if !v.IsSet("domains.secure") {
-		// Default to secure only in production
-		env := os.Getenv("MEDISYNTH_ENV")
-		cfg.Domains.Secure = env == "prod"
-		log.Printf("Domain security not specified, defaulting to %v based on environment", cfg.Domains.Secure)
-	}
-
-	log.Printf("Configuration loaded: %+v", cfg)
+	log.Printf("Configuration loaded successfully")
 	return &cfg, nil
 }

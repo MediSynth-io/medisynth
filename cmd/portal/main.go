@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,8 +13,8 @@ import (
 
 const version = "0.0.1"
 
-func initializePortal(configPath string) (http.Handler, error) {
-	cfg, err := config.LoadConfig(configPath)
+func initializePortal() (http.Handler, error) {
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -29,20 +28,17 @@ func initializePortal(configPath string) (http.Handler, error) {
 }
 
 func main() {
-	configPath := flag.String("config", "", "Path to configuration file")
-	flag.Parse()
+	log.Printf("Starting MediSynth Portal v%s", version)
 
-	log.Printf("Starting MediSynth Portal v%s with config: %s", version, *configPath)
-
-	handler, err := initializePortal(*configPath)
+	handler, err := initializePortal()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Get port from environment variable, fallback to config file
-	port := os.Getenv("MEDISYNTH_API_PORT")
+	port := os.Getenv("API_PORT")
 	if port == "" {
-		cfg, err := config.LoadConfig(*configPath)
+		cfg, err := config.LoadConfig()
 		if err != nil {
 			log.Fatal(err)
 		}
