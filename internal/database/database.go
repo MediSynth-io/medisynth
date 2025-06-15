@@ -21,10 +21,10 @@ func Init(cfg *config.Config) error {
 		return nil
 	}
 
-	log.Printf("Initializing database at path: %s", cfg.Database.Path)
+	log.Printf("Initializing database at path: %s", cfg.DatabasePath)
 
 	// Ensure data directory exists
-	dataDir := filepath.Dir(cfg.Database.Path)
+	dataDir := filepath.Dir(cfg.DatabasePath)
 	log.Printf("Ensuring data directory exists: %s", dataDir)
 
 	if err := createDataDir(dataDir); err != nil {
@@ -37,7 +37,7 @@ func Init(cfg *config.Config) error {
 	}
 
 	// Open database connection
-	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_foreign_keys=on", cfg.Database.Path)
+	dsn := fmt.Sprintf("%s?_journal_mode=WAL&_foreign_keys=on", cfg.DatabasePath)
 	log.Printf("Opening database connection with DSN: %s", dsn)
 
 	db, err := sql.Open("sqlite3", dsn)
@@ -59,7 +59,7 @@ func Init(cfg *config.Config) error {
 	}
 
 	dbConn = db
-	log.Printf("Database initialized successfully at %s", cfg.Database.Path)
+	log.Printf("Database initialized successfully at %s", cfg.DatabasePath)
 	return nil
 }
 

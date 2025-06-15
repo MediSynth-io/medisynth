@@ -11,13 +11,19 @@ import (
 func main() {
 	log.Printf("Testing database initialization...")
 
+	// Debug: Print environment variables
+	log.Printf("Environment variables:")
+	log.Printf("DB_PATH: %s", os.Getenv("DB_PATH"))
+	log.Printf("DOMAIN_API: %s", os.Getenv("DOMAIN_API"))
+	log.Printf("DOMAIN_PORTAL: %s", os.Getenv("DOMAIN_PORTAL"))
+
 	// Load configuration
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("Config loaded - DB Path: %s", cfg.Database.Path)
+	log.Printf("Config loaded - DB Path: %s", cfg.DatabasePath)
 
 	// Check if we can access the directory
 	dbDir := "/data"
