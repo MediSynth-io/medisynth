@@ -306,7 +306,7 @@ func CreateUser(email, password string) (*models.User, error) {
 	} else {
 		// SQLite with manual ID generation
 		now := time.Now()
-		user.ID = generateID()
+		user.ID = GenerateID()
 		user.CreatedAt = now
 		user.UpdatedAt = now
 
@@ -386,7 +386,7 @@ func CreateToken(userID string, name, token string, expiresAt *time.Time) (*mode
 			return nil, err
 		}
 	} else {
-		t.ID = generateID()
+		t.ID = GenerateID()
 		t.CreatedAt = time.Now()
 		_, err := dbConn.Exec(
 			"INSERT INTO tokens (id, user_id, token, name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -484,7 +484,7 @@ func CreateSession(userID string, token string, expiresAt time.Time) (*models.Se
 			return nil, err
 		}
 	} else {
-		session.ID = generateID()
+		session.ID = GenerateID()
 		session.CreatedAt = time.Now()
 		_, err := dbConn.Exec(
 			"INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
@@ -538,8 +538,8 @@ func CleanupExpiredSessions() error {
 	return err
 }
 
-// generateID generates a unique ID for SQLite, not needed for PostgreSQL
-func generateID() string {
+// GenerateID generates a unique ID for SQLite, not needed for PostgreSQL
+func GenerateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }
 
