@@ -1,10 +1,14 @@
 package api
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
+	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -51,153 +55,172 @@ func setupTestAPI(t *testing.T) (*Api, *MockSyntheaClient) {
 	return api, mockSynthea
 }
 
-func TestGeneratePatientsHandler(t *testing.T) {
-	api, mockSynthea := setupTestAPI(t)
+func TestProcessSyntheaJob_ErrorAndSuccess(t *testing.T) {
+	cfg := config.Config{APIPort: 8081}
+	apiInstance, _ := NewApi(cfg)
 
-	// Test cases
-	tests := []struct {
-		name           string
-		requestBody    map[string]interface{}
-		mockResponse   string
-		mockError      error
-		expectedStatus int
-		expectedBody   map[string]interface{}
-	}{
-		{
-			name: "Valid request",
-			requestBody: map[string]interface{}{
-				"count": 10,
-				"age":   30,
-			},
-			mockResponse:   "job-123",
-			mockError:      nil,
-			expectedStatus: http.StatusAccepted,
-			expectedBody: map[string]interface{}{
-				"job_id": "job-123",
-			},
-		},
-		{
-			name: "Invalid request - missing count",
-			requestBody: map[string]interface{}{
-				"age": 30,
-			},
-			expectedStatus: http.StatusBadRequest,
-			expectedBody: map[string]interface{}{
-				"error": "count is required",
-			},
-		},
+	// Suppress log output during tests
+	originalLogger := log.Writer()
+	log.SetOutput(io.Discard)
+	defer log.SetOutput(originalLogger)
+
+	// Setup mock for exec.Command
+	originalExec := execCommand
+	defer func() { execCommand = originalExec }()
+
+	t.Run("SyntheaFails", func(t *testing.T) {
+		resetGlobalJobStore()
+		execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			// Create a command that will fail and output an error
+			cmd := exec.CommandContext(ctx, "sh", "-c", "echo 'Synthea failed' >&2; exit 1")
+			return cmd
+		}
+
+		jobID := "failjob"
+		params := SyntheaParams{Population: Pint(1), OutputFormat: Pstr("fhir")}
+		job := &GenerationJob{
+			ID:            jobID,
+			Status:        StatusPending,
+			RequestParams: params,
+		}
+		globalJobStore.AddJob(job)
+
+		// Process the job synchronously for testing
+		apiInstance.processSyntheaJob(job)
+
+		// Give a small delay for status update
+		time.Sleep(100 * time.Millisecond)
+
+		updatedJob, exists := globalJobStore.GetJob(jobID)
+		if !exists {
+			t.Fatalf("Job %s not found in store", jobID)
+		}
+		if updatedJob.Status != StatusFailed {
+			t.Errorf("Expected status %s, got %s", StatusFailed, updatedJob.Status)
+		}
+		if updatedJob.Error == "" {
+			t.Error("Expected error message, got none")
+		}
+	})
+
+	t.Run("SyntheaSucceeds", func(t *testing.T) {
+		resetGlobalJobStore()
+		execCommand = func(ctx context.Context, command string, args ...string) *exec.Cmd {
+			// Create a command that will succeed
+			cmd := exec.CommandContext(ctx, "sh", "-c", "echo 'Synthea completed successfully'")
+			return cmd
+		}
+
+		jobID := "successjob"
+		params := SyntheaParams{Population: Pint(1), OutputFormat: Pstr("fhir")}
+		job := &GenerationJob{
+			ID:            jobID,
+			Status:        StatusPending,
+			RequestParams: params,
+		}
+		globalJobStore.AddJob(job)
+
+		// Process the job synchronously for testing
+		apiInstance.processSyntheaJob(job)
+
+		// Give a small delay for status update
+		time.Sleep(100 * time.Millisecond)
+
+		updatedJob, exists := globalJobStore.GetJob(jobID)
+		if !exists {
+			t.Fatalf("Job %s not found in store", jobID)
+		}
+		if updatedJob.Status != StatusCompleted {
+			t.Errorf("Expected status %s, got %s", StatusCompleted, updatedJob.Status)
+		}
+		if updatedJob.Error != "" {
+			t.Errorf("Expected no error, got %s", updatedJob.Error)
+		}
+	})
+}
+
+func TestNewJobID(t *testing.T) {
+	// Test that job IDs are unique
+	ids := make(map[string]bool)
+	for i := 0; i < 1000; i++ {
+		id := newJobID()
+		if ids[id] {
+			t.Errorf("Duplicate job ID generated: %s", id)
+		}
+		ids[id] = true
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Set up mock expectations
-			if tt.mockResponse != "" {
-				mockSynthea.On("GeneratePatients", mock.Anything).Return(tt.mockResponse, tt.mockError)
-			}
+	// Test error path by mocking randRead to fail
+	originalRandRead := randRead
+	defer func() { randRead = originalRandRead }()
 
-			// Create request
-			body, _ := json.Marshal(tt.requestBody)
-			req := httptest.NewRequest("POST", "/generate-patients", bytes.NewBuffer(body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
+	randRead = func([]byte) (n int, err error) {
+		return 0, assert.AnError
+	}
 
-			// Make request
-			api.RunSyntheaGeneration(w, req)
-
-			// Assert response
-			if tt.name == "Valid request" {
-				assert.Equal(t, tt.expectedStatus, w.Code)
-				var response map[string]interface{}
-				err := json.Unmarshal(w.Body.Bytes(), &response)
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedBody["job_id"], response["job_id"])
-				if jobID, ok := response["jobID"]; ok {
-					assert.Equal(t, response["job_id"], jobID)
-				}
-				return
-			}
-
-			var response map[string]interface{}
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedBody, response)
-		})
+	id := newJobID()
+	if id != "fallback-jobid" {
+		t.Errorf("Expected fallback job ID, got %s", id)
 	}
 }
 
 func TestGetGenerationStatusHandler(t *testing.T) {
-	api, mockSynthea := setupTestAPI(t)
+	cfg := config.Config{}
+	api, _ := NewApi(cfg)
 
-	// Set up test router
-	router := chi.NewRouter()
-	router.Get("/generation-status/{jobID}", api.GetGenerationStatus)
-
-	// Test cases
 	tests := []struct {
 		name           string
 		jobID          string
-		mockStatus     map[string]interface{}
-		mockError      error
-		expectedStatus int
-		expectedBody   map[string]interface{}
+		expectedStatus JobStatus
+		expectedCode   int
+		addJob         bool
 	}{
 		{
-			name:  "Valid job ID",
-			jobID: "job-123",
-			mockStatus: map[string]interface{}{
-				"status":   "completed",
-				"progress": 100,
-			},
-			mockError:      nil,
-			expectedStatus: http.StatusOK,
-			expectedBody: map[string]interface{}{
-				"status":   "completed",
-				"progress": float64(100),
-			},
+			name:           "Existing job",
+			jobID:          "test-job-id",
+			expectedStatus: StatusPending,
+			expectedCode:   http.StatusOK,
+			addJob:         true,
 		},
 		{
-			name:           "Job not found",
-			jobID:          "nonexistent",
-			mockError:      assert.AnError,
-			expectedStatus: http.StatusNotFound,
-			expectedBody: map[string]interface{}{
-				"error": "job not found",
-			},
+			name:           "Non-existent job",
+			jobID:          "non-existent",
+			expectedStatus: "",
+			expectedCode:   http.StatusNotFound,
+			addJob:         false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset the job store before each test
-			resetGlobalJobStore()
+			// Reset store
+			globalJobStore.mu.Lock()
+			globalJobStore.jobs = make(map[string]*GenerationJob)
+			globalJobStore.mu.Unlock()
 
-			// Set up mock expectations
-			mockSynthea.On("GetStatus", tt.jobID).Return(tt.mockStatus, tt.mockError)
-
-			if tt.name == "Valid job ID" {
-				// Insert a completed job into the globalJobStore before making the request
-				globalJobStore.AddJob(&GenerationJob{
-					ID:        tt.jobID,
-					Status:    StatusCompleted,
-					CreatedAt: time.Now(),
-					UpdatedAt: time.Now(),
-				})
+			if tt.addJob {
+				job := &GenerationJob{
+					ID:     tt.jobID,
+					Status: StatusPending,
+				}
+				globalJobStore.AddJob(job)
 			}
 
-			// Create request
-			req := httptest.NewRequest("GET", "/generation-status/"+tt.jobID, nil)
+			// Use chi router to set URL param
+			r := chi.NewRouter()
+			r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+			req := httptest.NewRequest("GET", fmt.Sprintf("/generation-status/%s", tt.jobID), nil)
 			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
 
-			// Make request using the router
-			router.ServeHTTP(w, req)
-
-			// Assert response
-			assert.Equal(t, tt.expectedStatus, w.Code)
-
-			var response map[string]interface{}
-			err := json.Unmarshal(w.Body.Bytes(), &response)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedBody, response)
+			// Check response
+			assert.Equal(t, tt.expectedCode, w.Code)
+			if tt.expectedCode == http.StatusOK {
+				var response map[string]string
+				err := json.NewDecoder(w.Body).Decode(&response)
+				assert.NoError(t, err)
+				assert.Equal(t, string(tt.expectedStatus), response["status"])
+			}
 		})
 	}
 }

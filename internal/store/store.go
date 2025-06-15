@@ -1,0 +1,46 @@
+package store
+
+import (
+	"time"
+
+	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/models"
+)
+
+// Store handles all database operations
+type Store struct{}
+
+// New creates a new store instance
+func New() *Store {
+	return &Store{}
+}
+
+// CreateUser creates a new user
+func (s *Store) CreateUser(email, password string) (*models.User, error) {
+	return database.CreateUser(email, password)
+}
+
+// GetUserByEmail retrieves a user by email
+func (s *Store) GetUserByEmail(email string) (*models.User, error) {
+	return database.GetUserByEmail(email)
+}
+
+// CreateToken creates a new API token
+func (s *Store) CreateToken(userID string, name, token string, expiresAt *time.Time) (*models.Token, error) {
+	return database.CreateToken(userID, name, token, expiresAt)
+}
+
+// GetTokenByValue retrieves a token by its value
+func (s *Store) GetTokenByValue(token string) (*models.Token, error) {
+	return database.GetTokenByValue(token)
+}
+
+// DeleteToken deletes a token
+func (s *Store) DeleteToken(userID string, tokenID string) error {
+	return database.DeleteToken(userID, tokenID)
+}
+
+// GetUserTokens retrieves all tokens for a user
+func (s *Store) GetUserTokens(userID string) ([]*models.Token, error) {
+	return database.GetUserTokens(userID)
+}

@@ -1,0 +1,226 @@
+{{template "base.html" .}}
+
+{{define "title"}}Documentation - MediSynth Portal{{end}}
+
+{{define "content"}}
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div class="px-4 py-6 sm:px-0">
+        <div class="border-b border-gray-200 pb-5">
+            <h1 class="text-3xl font-bold leading-tight text-gray-900">API Documentation</h1>
+            <p class="mt-2 text-sm text-gray-500">Complete guide to using the MediSynth API</p>
+        </div>
+
+        <div class="mt-8 space-y-12">
+            <!-- Authentication -->
+            <section id="authentication" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-900">Authentication</h2>
+                <p class="text-gray-600">All API requests must be authenticated using a Bearer token.</p>
+                <div class="bg-gray-50 p-4 rounded-md">
+                    <pre class="text-sm text-gray-800">curl -H "Authorization: Bearer YOUR_API_TOKEN" https://api.medisynth.io/v1/...</pre>
+                </div>
+            </section>
+
+            <!-- Endpoints -->
+            <section id="endpoints" class="space-y-8">
+                <h2 class="text-2xl font-bold text-gray-900">Endpoints</h2>
+
+                <!-- Generate Data -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Generate Synthetic Data
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            POST /v1/generate
+                        </p>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                Generate synthetic medical data based on specified parameters.
+                            </p>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "count": 100,
+  "type": "patient",
+  "parameters": {
+    "age_range": [20, 80],
+    "conditions": ["diabetes", "hypertension"],
+    "include_medications": true
+  }
+}</pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "data": [{
+    "id": "p_123",
+    "age": 45,
+    "conditions": ["diabetes"],
+    "medications": [{
+      "name": "Metformin",
+      "dosage": "500mg"
+    }]
+  }, ...]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Validate Data -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Validate Data
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            POST /v1/validate
+                        </p>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                Validate medical data against known patterns and rules.
+                            </p>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "data": [{
+    "id": "p_123",
+    "age": 45,
+    "conditions": ["diabetes"],
+    "medications": [{
+      "name": "Metformin",
+      "dosage": "500mg"
+    }]
+  }]
+}</pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "valid": true,
+  "errors": [],
+  "warnings": [{
+    "field": "medications[0].dosage",
+    "message": "Consider specifying frequency"
+  }]
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export Data -->
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Export Data
+                        </h3>
+                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
+                            POST /v1/export
+                        </p>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <p class="text-sm text-gray-600">
+                                Export generated data in various formats.
+                            </p>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "format": "csv",
+  "data_ids": ["p_123", "p_124"],
+  "fields": ["id", "age", "conditions"]
+}</pre>
+                            </div>
+                            <div class="space-y-2">
+                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
+                                <p class="text-sm text-gray-600">Returns a file in the requested format.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Handling -->
+            <section id="errors" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-900">Error Handling</h2>
+                <p class="text-gray-600">The API uses conventional HTTP response codes to indicate success or failure.</p>
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="space-y-4">
+                            <ul class="list-disc list-inside text-sm text-gray-600">
+                                <li><span class="font-medium">200</span> - Success</li>
+                                <li><span class="font-medium">400</span> - Bad Request (invalid parameters)</li>
+                                <li><span class="font-medium">401</span> - Unauthorized (invalid token)</li>
+                                <li><span class="font-medium">403</span> - Forbidden (insufficient permissions)</li>
+                                <li><span class="font-medium">404</span> - Not Found</li>
+                                <li><span class="font-medium">429</span> - Too Many Requests</li>
+                                <li><span class="font-medium">500</span> - Internal Server Error</li>
+                            </ul>
+                            <div class="mt-4">
+                                <h4 class="text-sm font-medium text-gray-900">Error Response Format</h4>
+                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+  "error": {
+    "code": "invalid_parameters",
+    "message": "Invalid age range specified",
+    "details": {
+      "field": "parameters.age_range",
+      "reason": "Maximum age must be less than 120"
+    }
+  }
+}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Rate Limiting -->
+            <section id="rate-limiting" class="space-y-4">
+                <h2 class="text-2xl font-bold text-gray-900">Rate Limiting</h2>
+                <p class="text-gray-600">API requests are rate limited based on your subscription tier.</p>
+                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Tier
+                                    </th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Rate Limit
+                                    </th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Burst Limit
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Free</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">100/hour</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">200</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Pro</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1000/hour</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2000</td>
+                                </tr>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Enterprise</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Custom</td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Custom</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+{{end}} 

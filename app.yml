@@ -1,1 +1,11 @@
-apiPort: 8081
+apiPort: 8081  # Port for API service
+database:
+  path: data/medisynth.db
+  socketPath: data/sqlite.sock
+  walMode: true
+  maxRetries: 5
+  retryDelay: 5
+domains:
+  portal: portal.local
+  api: api.local
+  secure: false  # Use HTTP for local development

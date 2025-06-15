@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: medisynth-api
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVICE_TYPE=api
+      - MEDISYNTH_ENV=${MEDISYNTH_ENV:-dev}
+      - MEDISYNTH_API_PORT=8081
+    volumes:
+      - ./data:/app/data
+      - ./app.yml:/app/app.yml
+      - ./app.prod.yml:/app/app.prod.yml
+    networks:
+      - medisynth
+    restart: unless-stopped
+
+  portal:
+    build: .
+    container_name: medisynth-portal
+    ports:
+      - "8082:8081"
+    environment:
+      - SERVICE_TYPE=portal
+      - MEDISYNTH_ENV=${MEDISYNTH_ENV:-dev}
+      - MEDISYNTH_API_PORT=8081
+    volumes:
+      - ./static:/app/static
+      - ./templates:/app/templates
+      - ./app.yml:/app/app.yml
+      - ./app.prod.yml:/app/app.prod.yml
+    networks:
+      - medisynth
+    restart: unless-stopped
+    depends_on:
+      - api
+
+networks:
+  medisynth:
+    driver: bridge 

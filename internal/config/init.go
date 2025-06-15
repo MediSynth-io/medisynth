@@ -1,35 +1,46 @@
 package config
 
 import (
-	"github.com/spf13/viper"
+	"fmt"
+	"os"
+	"path/filepath"
 )
 
-func Init() (*Config, error) { // Changed return type
-	viper.SetDefault("config_dir", ".") // Assuming app.yml is in the execution directory
-	viper.AutomaticEnv()
-
-	viper.AddConfigPath(viper.GetString("config_dir"))
-	viper.SetConfigName("app") // Name of config file (without extension)
-	viper.SetConfigType("yml") // Type of config file (yaml for app.yml)
-
-	if err := viper.ReadInConfig(); err != nil {
-		// It's better to return the error and let the caller decide if it's fatal
-		// or if defaults should be used.
-		// For now, we'll return the error.
-		return nil, err // Changed return
+// Init initializes the configuration based on the environment
+func Init() (*Config, error) {
+	env := os.Getenv("MEDISYNTH_ENV")
+	if env == "" {
+		env = "dev" // Default to development environment
 	}
 
-	var c Config // Use AppConfig here
+	configFile := "app.yml"
+	if env == "prod" {
+		configFile = "app.prod.yml"
+	}
 
-	err := viper.Unmarshal(&c)
+	// Get the executable directory
+	execPath, err := os.Executable()
 	if err != nil {
-		return nil, err // Changed return
+		return nil, fmt.Errorf("failed to get executable path: %w", err)
+	}
+	execDir := filepath.Dir(execPath)
+
+	// Try to load config from different possible locations
+	configPaths := []string{
+		filepath.Join(execDir, configFile),          // Next to the binary
+		filepath.Join(execDir, "..", configFile),    // One level up
+		filepath.Join(".", configFile),              // Current directory
+		filepath.Join("/etc/medisynth", configFile), // System-wide config
 	}
 
-	// Set default port if not specified, similar to LoadConfig
-	if c.APIPort == 0 {
-		c.APIPort = 8080 // Default port
+	var loadErr error
+	for _, path := range configPaths {
+		cfg, err := LoadConfig(path)
+		if err == nil {
+			return cfg, nil
+		}
+		loadErr = err
 	}
 
-	return &c, nil
+	return nil, fmt.Errorf("failed to load config from any location: %w", loadErr)
 }

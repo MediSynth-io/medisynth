@@ -13,9 +13,20 @@ spec:
   tls:
   - hosts:
     - api.medisynth.io 
+    - portal.medisynth.io
     secretName: medisynth-api-tls-secret
   rules:
   - host: api.medisynth.io 
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: medisynth-api-svc
+            port:
+              name: http
+  - host: portal.medisynth.io
     http:
       paths:
       - path: /

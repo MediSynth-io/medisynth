@@ -1,5 +1,8 @@
 FROM golang:1.24-alpine AS builder
 
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev
+
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -7,12 +10,13 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
+# Build with CGO enabled
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -o medisynth-api ./cmd/api/main.go
 
 FROM alpine:latest
 
-# Install OpenJDK 11 (a common choice for Synthea) and curl for healthcheck
-RUN apk add --no-cache openjdk11-jre curl
+# Install runtime dependencies
+RUN apk add --no-cache openjdk11-jre curl ca-certificates tzdata
 
 # Create a directory for the application and Synthea
 RUN mkdir -p /app
@@ -38,14 +42,17 @@ RUN chown appuser:appgroup /app/app.yml
 # Copy the built Go application and set ownership
 COPY --from=builder --chown=appuser:appgroup /app/medisynth-api /app/medisynth-api
 
+# Copy templates directory
+COPY --from=builder --chown=appuser:appgroup /app/templates /app/templates
+
 # Switch to non-root user
 USER appuser
 # WORKDIR is already /app, which is where app.yml and medisynth-api are.
 
-EXPOSE 8080
+EXPOSE 8081
 
 # Healthcheck (increased start-period slightly for Java initialization)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -f http://localhost:8080/heartbeat || exit 1
+  CMD curl -f http://localhost:8081/heartbeat || exit 1
 
 CMD ["./medisynth-api"]

@@ -1,10 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: medisynth-api-deployment
+  name: medisynth-api
   namespace: medisynth-io
   labels:
     app: medisynth-api
+  annotations:
+    timestamp: "2024-03-19-095500"  # This will be updated with each deployment
 spec:
   replicas: 1
   selector:
@@ -20,28 +22,67 @@ spec:
       containers:
       - name: medisynth-api
         image: ghcr.io/medisynth-io/medisynth:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8081 
+          name: http
         resources:
           requests:
-            memory: "500Mi"
-            cpu: "500m"
+            memory: "256Mi"
+            cpu: "100m"
           limits:
-            memory: "5000Mi"
-            cpu: "3000m"
+            memory: "512Mi"
+            cpu: "500m"
         livenessProbe:
           httpGet:
             path: /heartbeat
-            port: 8081
-          initialDelaySeconds: 15
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /heartbeat
-            port: 8081
+            port: http
           initialDelaySeconds: 5
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
+          periodSeconds: 5
+        volumeMounts:
+        - name: sqlite-data
+          mountPath: /data
+        - name: config
+          mountPath: /app/config
+        env:
+        - name: MEDISYNTH_ENV
+          value: "prod"
+        - name: CONFIG_DIR
+          value: /app/config
+        - name: DB_PATH
+          value: /data/medisynth.db
+        - name: MEDISYNTH_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-secrets
+              key: jwt-secret
+        - name: MEDISYNTH_SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-secrets
+              key: session-secret
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+      initContainers:
+      - name: init-db
+        image: keinos/sqlite3
+        command: ["sh", "-c", "mkdir -p /data && touch /data/medisynth.db && sqlite3 /data/medisynth.db 'PRAGMA journal_mode=WAL;' && chmod 777 /data/medisynth.db && chmod 777 /data"]
+        volumeMounts:
+        - name: sqlite-data
+          mountPath: /data
+        securityContext:
+          runAsUser: 0
+      volumes:
+      - name: sqlite-data
+        persistentVolumeClaim:
+          claimName: medisynth-sqlite-pvc
+      - name: config
+        configMap:
+          name: medisynth-config

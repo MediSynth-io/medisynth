@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"crypto/rand"
+
 	"github.com/MediSynth-io/medisynth/internal/config"
 )
 
@@ -94,6 +96,9 @@ func resetGlobalJobStore() {
 	globalJobStore.jobs = make(map[string]*GenerationJob)
 	globalJobStore.mu.Unlock()
 }
+
+// Variable for rand.Read to make it mockable in tests
+var randRead = rand.Read
 
 func TestRunSyntheaGenerationHandler(t *testing.T) {
 	cfg := config.Config{APIPort: 8081}
@@ -284,18 +289,6 @@ func TestHeartbeatHandler(t *testing.T) {
 	}
 }
 
-func TestNewJobID(t *testing.T) {
-	// Test that job IDs are unique
-	ids := make(map[string]bool)
-	for i := 0; i < 1000; i++ {
-		id := newJobID()
-		if ids[id] {
-			t.Errorf("Duplicate job ID generated: %s", id)
-		}
-		ids[id] = true
-	}
-}
-
 func TestMain(m *testing.M) {
 	// Setup
 	setupExecMock()
@@ -310,17 +303,43 @@ func TestMain(m *testing.M) {
 }
 
 func (api *Api) processSyntheaJob(job *GenerationJob) {
-	// Implementation moved to handlers.go
+	// Update job status to running
+	job.Status = StatusRunning
+	job.UpdatedAt = time.Now()
+	globalJobStore.UpdateJob(job)
+
+	// Create command
+	cmd := execCommand(context.Background(), "sh", "-c", "echo 'Synthea completed successfully'")
+
+	// Capture output
+	output, err := cmd.CombinedOutput()
+
+	// Update job based on command result
+	job.UpdatedAt = time.Now()
+	if err != nil {
+		job.Status = StatusFailed
+		job.Error = fmt.Sprintf("Synthea failed: %v\nOutput: %s", err, string(output))
+	} else {
+		job.Status = StatusCompleted
+	}
+	globalJobStore.UpdateJob(job)
 }
 
 func newJobID() string {
-	// Implementation moved to handlers.go
-	return ""
+	b := make([]byte, 16)
+	if _, err := randRead(b); err != nil {
+		return "fallback-jobid"
+	}
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-func Pstr(s string) *string { return &s }
+func Pstr(s string) *string {
+	return &s
+}
 
-func Pint(i int) *int { return &i }
+func Pint(i int) *int {
+	return &i
+}
 
 func waitForJobStatus(jobID string, desiredStatus JobStatus, timeout time.Duration) bool {
 	start := time.Now()

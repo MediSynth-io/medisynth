@@ -1,0 +1,11 @@
+apiPort: 8081  # Port for API service
+database:
+  path: /data/medisynth.db
+  socketPath: /data/sqlite.sock
+  walMode: true
+  maxRetries: 5
+  retryDelay: 5
+domains:
+  portal: portal.medisynth.io
+  api: api.medisynth.io
+  secure: true  # Use HTTPS in production 

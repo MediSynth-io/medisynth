@@ -2,15 +2,18 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewApi(t *testing.T) {
@@ -39,6 +42,45 @@ func TestNewApi(t *testing.T) {
 			t.Errorf("Expected error message '%s', got '%s'", expectedErrorMsg, err.Error())
 		}
 	})
+}
+
+func TestServe(t *testing.T) {
+	// Create API instance with test port
+	cfg := config.Config{APIPort: 8081}
+	api, err := NewApi(cfg)
+	assert.NoError(t, err)
+
+	// Start server in a goroutine
+	go func() {
+		api.Serve()
+	}()
+
+	// Give the server a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Test root endpoint
+	resp, err := http.Get("http://localhost:8081/")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", string(body))
+
+	// Test heartbeat endpoint
+	resp, err = http.Get("http://localhost:8081/heartbeat")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	var heartbeatResp map[string]string
+	err = json.NewDecoder(resp.Body).Decode(&heartbeatResp)
+	resp.Body.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, "ok", heartbeatResp["status"])
+
+	// Test non-existent endpoint
+	resp, err = http.Get("http://localhost:8081/nonexistent")
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
 // Helper to set up a test server for routing tests
@@ -179,4 +221,65 @@ func TestAPIRoutes(t *testing.T) {
 	// More tests for GetGenerationStatus with actual jobs (pending, completed, failed)
 	// would require manipulating globalJobStore and potentially waiting for processSyntheaJob.
 	// This becomes more of an integration test for the handlers.
+}
+
+func TestGetGenerationStatus(t *testing.T) {
+	cfg := config.Config{}
+	api, _ := NewApi(cfg)
+
+	tests := []struct {
+		name           string
+		jobID          string
+		expectedStatus JobStatus
+		expectedCode   int
+		addJob         bool
+	}{
+		{
+			name:           "Existing job",
+			jobID:          "test-job-id",
+			expectedStatus: StatusPending,
+			expectedCode:   http.StatusOK,
+			addJob:         true,
+		},
+		{
+			name:           "Non-existent job",
+			jobID:          "non-existent",
+			expectedStatus: "",
+			expectedCode:   http.StatusNotFound,
+			addJob:         false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset store
+			globalJobStore.mu.Lock()
+			globalJobStore.jobs = make(map[string]*GenerationJob)
+			globalJobStore.mu.Unlock()
+
+			if tt.addJob {
+				job := &GenerationJob{
+					ID:     tt.jobID,
+					Status: StatusPending,
+				}
+				globalJobStore.AddJob(job)
+			}
+
+			// Use chi router to set URL param
+			r := chi.NewRouter()
+			r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+			req := httptest.NewRequest("GET", fmt.Sprintf("/generation-status/%s", tt.jobID), nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			// Check response
+			assert.Equal(t, tt.expectedCode, w.Code)
+			if tt.expectedCode == http.StatusOK {
+				var response map[string]string
+				err := json.NewDecoder(w.Body).Decode(&response)
+				assert.NoError(t, err)
+				assert.Equal(t, string(tt.expectedStatus), response["status"])
+			}
+		})
+	}
 }
