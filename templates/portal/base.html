@@ -48,6 +48,9 @@
                             <a href="/jobs/new" class="{{if eq .ActivePage "New Job"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                 Generate Data
                             </a>
+                            <a href="/orders" class="{{if or (eq .ActivePage "My Orders") (eq .ActivePage "Order Details") (eq .ActivePage "Create Order")}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Orders
+                            </a>
                             <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                 API Tokens
                             </a>
@@ -126,6 +129,7 @@
                     <a href="/dashboard" class="{{if eq .ActivePage "Dashboard"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Dashboard</a>
                     <a href="/jobs" class="{{if eq .ActivePage "Generation History"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Jobs</a>
                     <a href="/jobs/new" class="{{if eq .ActivePage "New Job"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Generate Data</a>
+                    <a href="/orders" class="{{if or (eq .ActivePage "My Orders") (eq .ActivePage "Order Details") (eq .ActivePage "Create Order")}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Orders</a>
                     <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">API Tokens</a>
                     <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Documentation</a>
                     <hr class="my-2">

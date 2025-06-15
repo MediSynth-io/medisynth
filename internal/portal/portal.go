@@ -74,8 +74,29 @@ func (p *Portal) Routes() http.Handler {
 
 		// Check if this is the main domain (medisynth.io) or subdomain (portal.medisynth.io)
 		if strings.Contains(r.Host, "portal.") {
-			// This is the portal subdomain, serve the portal home page
-			p.HandleHome(w, r)
+			// This is the portal subdomain, check if user is logged in
+			var userID string
+
+			// Check for valid session cookie
+			cookie, err := r.Cookie("session")
+			if err == nil && cookie.Value != "" {
+				// Validate the session
+				userID, err = auth.ValidateSession(cookie.Value)
+				if err == nil && userID != "" {
+					log.Printf("[HOME] Found valid session for user: %s", userID)
+				}
+			}
+
+			if userID != "" {
+				// User is logged in, add user context and serve logged-in home page
+				ctx := r.Context()
+				ctx = context.WithValue(ctx, "userID", userID)
+				p.HandleHome(w, r.WithContext(ctx))
+			} else {
+				// User is not logged in, serve the public portal home page
+				log.Printf("[HOME] No valid session found, serving public home page")
+				p.HandleHome(w, r)
+			}
 		} else {
 			// This is the main domain, serve the landing page
 			p.handleLanding(w, r)
