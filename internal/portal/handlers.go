@@ -29,9 +29,18 @@ func (p *Portal) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleRegister(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, r, "register.html", "Register", map[string]interface{}{
-		"PasswordRequirements": auth.GetPasswordRequirements(),
-	})
+	log.Printf("[REGISTER] Handling register GET request from %s", r.RemoteAddr)
+
+	// Get password requirements
+	passwordReqs := auth.GetPasswordRequirements()
+	log.Printf("[REGISTER] Password requirements: %+v", passwordReqs)
+
+	data := map[string]interface{}{
+		"PasswordRequirements": passwordReqs,
+	}
+
+	log.Printf("[REGISTER] Rendering register template with data: %+v", data)
+	p.renderTemplate(w, r, "register.html", "Register", data)
 }
 
 func (p *Portal) handleLoginRedirect(w http.ResponseWriter, r *http.Request) {
@@ -52,6 +61,8 @@ func (p *Portal) handleLoginRedirect(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleRegisterRedirect(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[REGISTER_REDIRECT] Method: %s, Host: %s, Path: %s", r.Method, r.Host, r.URL.Path)
+
 	// Check if we're on the main domain and need to redirect to portal
 	if !strings.Contains(r.Host, "portal.") {
 		log.Printf("[REDIRECT] Redirecting register from %s to portal.medisynth.io", r.Host)
@@ -60,10 +71,14 @@ func (p *Portal) handleRegisterRedirect(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	log.Printf("[REGISTER_REDIRECT] On portal domain, handling %s request", r.Method)
+
 	// We're on portal domain, handle normally
 	if r.Method == "GET" {
+		log.Printf("[REGISTER_REDIRECT] Calling handleRegister for GET request")
 		p.handleRegister(w, r)
 	} else {
+		log.Printf("[REGISTER_REDIRECT] Calling handleRegisterPost for %s request", r.Method)
 		p.handleRegisterPost(w, r)
 	}
 }
