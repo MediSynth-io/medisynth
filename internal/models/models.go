@@ -13,6 +13,7 @@ type User struct {
 	Password  string    `json:"-"` // Password is never exposed in JSON
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	IsAdmin   bool      `json:"is_admin" db:"is_admin"`
 }
 
 // NewUser creates a new user with a hashed password
@@ -38,7 +39,7 @@ func (u *User) ValidatePassword(password string) bool {
 
 // Token represents an API token
 type Token struct {
-	ID        string     `json:"id"`
+	ID        string     `json:"id" db:"id"`
 	UserID    string     `json:"user_id"`
 	Token     string     `json:"token"`
 	Name      string     `json:"name"`
@@ -46,11 +47,11 @@ type Token struct {
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 }
 
-// Session represents a user session
+// Session represents a user's session
 type Session struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	Token     string    `json:"token"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
+	ID        string    `json:"id" db:"id"`
+	UserID    string    `json:"user_id" db:"user_id"`
+	Token     string    `json:"token" db:"token"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ExpiresAt time.Time `json:"expires_at" db:"expires_at"`
 }

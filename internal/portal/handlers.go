@@ -1,14 +1,19 @@
 package portal
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/models"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -72,37 +77,19 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	log.Printf("[LOGIN] Attempting login for email: %s", email)
-	log.Printf("[LOGIN] Password length: %d characters", len(password))
-	log.Printf("[LOGIN] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
-
 	user, err := auth.ValidateUser(email, password)
 	if err != nil {
-		log.Printf("[LOGIN] Authentication failed for %s: %v", email, err)
-		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{
-			"Error": "Invalid email or password",
-			"Email": email,
-		})
+		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Invalid email or password", "Email": email})
 		return
 	}
 
-	log.Printf("[LOGIN] Authentication successful for user: %s (ID: %s)", email, user.ID)
-
-	// Create session
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		log.Printf("[LOGIN] Error creating session for %s: %v", email, err)
-		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{
-			"Error": "Failed to create session. Please try again.",
-			"Email": email,
-		})
+		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Failed to create session.", "Email": email})
 		return
 	}
 
-	log.Printf("[LOGIN] Session created successfully for %s, token length: %d", email, len(token))
-
-	// Set session cookie
-	cookie := &http.Cookie{
+	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
@@ -111,12 +98,7 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Secure:   p.config.DomainSecure,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
-	}
-	http.SetCookie(w, cookie)
-
-	log.Printf("[LOGIN] Cookie set for %s - Domain: %s, Secure: %v", email, p.config.DomainPortal, p.config.DomainSecure)
-	log.Printf("[LOGIN] Redirecting %s to /dashboard", email)
-
+	})
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -125,67 +107,29 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
-	log.Printf("[REGISTER] Registration attempt for email: %s", email)
-	log.Printf("[REGISTER] Password length: %d, Confirm length: %d", len(password), len(confirmPassword))
-	log.Printf("[REGISTER] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
-	log.Printf("[REGISTER] Content-Type: %s", r.Header.Get("Content-Type"))
-
-	data := map[string]interface{}{
-		"Email":                email,
-		"PasswordRequirements": auth.GetPasswordRequirements(),
-	}
-
-	if !auth.ValidateEmail(email) {
-		log.Printf("[REGISTER] Email validation failed for: %s", email)
-		data["Error"] = "Please enter a valid email address"
-		p.renderTemplate(w, r, "register.html", "Register", data)
-		return
-	}
+	data := map[string]interface{}{"Email": email}
 
 	if password != confirmPassword {
-		log.Printf("[REGISTER] Password confirmation mismatch for: %s", email)
 		data["Error"] = "Passwords do not match"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
-	if !auth.ValidatePassword(password) {
-		log.Printf("[REGISTER] Password validation failed for: %s", email)
-		data["Error"] = "Password does not meet the requirements"
-		p.renderTemplate(w, r, "register.html", "Register", data)
-		return
-	}
-
-	log.Printf("[REGISTER] All validations passed for: %s", email)
-
 	user, err := auth.RegisterUser(email, password)
 	if err != nil {
-		log.Printf("[REGISTER] Failed to register user %s: %v", email, err)
-		if strings.Contains(err.Error(), "UNIQUE constraint") {
-			data["Error"] = "This email is already registered"
-		} else {
-			data["Error"] = "Registration failed. Please try again."
-			log.Printf("[REGISTER] Registration error: %v", err)
-		}
+		data["Error"] = "Registration failed. Please try again."
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
-	log.Printf("[REGISTER] User successfully created: %s (ID: %s)", email, user.ID)
-
-	// Create session
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		log.Printf("[REGISTER] Error creating session for %s: %v", email, err)
-		data["Error"] = "Registration successful but failed to log in. Please try logging in."
+		data["Error"] = "Registration successful but could not log in."
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
-	log.Printf("[REGISTER] Session created successfully for %s, token length: %d", email, len(token))
-
-	// Set session cookie
-	cookie := &http.Cookie{
+	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
 		Value:    token,
 		Path:     "/",
@@ -194,17 +138,17 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		Secure:   p.config.DomainSecure,
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
-	}
-	http.SetCookie(w, cookie)
-
-	log.Printf("[REGISTER] Cookie set - Domain: %s, Secure: %v, SameSite: %v", p.config.DomainPortal, p.config.DomainSecure, http.SameSiteStrictMode)
-	log.Printf("[REGISTER] Redirecting %s to /dashboard", email)
-
+	})
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		log.Printf("Error: userID not found in context")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	log.Printf("[DASHBOARD] Rendering dashboard for user: %s", userID)
 	log.Printf("[DASHBOARD] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
@@ -293,27 +237,32 @@ func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 
 func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session")
-	if err == nil && cookie.Value != "" {
-		_ = auth.DeleteSession(cookie.Value)
+	if err == nil {
+		auth.DeleteSession(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:     "session",
-		Value:    "",
-		Path:     "/",
-		Domain:   p.config.DomainPortal,
-		HttpOnly: true,
-		Secure:   p.config.DomainSecure,
-		Expires:  time.Unix(0, 0),
-		SameSite: http.SameSiteStrictMode,
+		Name:    "session",
+		Value:   "",
+		Path:    "/",
+		Expires: time.Unix(0, 0),
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (p *Portal) handleJobs(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(string)
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		log.Printf("Error: userID not found in context")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[JOBS] Rendering jobs for user: %s", userID)
+	log.Printf("[JOBS] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
+
 	jobs, err := database.GetJobsByUserID(userID)
 	if err != nil {
-		log.Printf("Error getting jobs for user %s: %v", userID, err)
+		log.Printf("[JOBS] Error getting jobs for user %s: %v", userID, err)
 		http.Error(w, "Could not retrieve job history.", http.StatusInternalServerError)
 		return
 	}
@@ -322,6 +271,81 @@ func (p *Portal) handleJobs(w http.ResponseWriter, r *http.Request) {
 		"Jobs": jobs,
 	}
 	p.renderTemplate(w, r, "jobs.html", "Generation History", data)
+}
+
+func (p *Portal) handleNewJob(w http.ResponseWriter, r *http.Request) {
+	p.renderTemplate(w, r, "new-job.html", "New Job", nil)
+}
+
+func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	params := models.SyntheaParams{
+		Population:   toIntPtr(r.FormValue("population")),
+		Gender:       toStringPtr(r.FormValue("gender")),
+		AgeMin:       toIntPtr(r.FormValue("ageMin")),
+		AgeMax:       toIntPtr(r.FormValue("ageMax")),
+		State:        toStringPtr(r.FormValue("state")),
+		City:         toStringPtr(r.FormValue("city")),
+		OutputFormat: toStringPtr(r.FormValue("outputFormat")),
+	}
+
+	// Marshal the params to a JSON byte slice
+	bodyBytes, err := json.Marshal(params)
+	if err != nil {
+		http.Error(w, "Failed to create job request", http.StatusInternalServerError)
+		return
+	}
+
+	// Create a new simulated request for the API handler
+	// We pass the portal's request context, which includes the authenticated userID
+	apiReq, err := http.NewRequestWithContext(r.Context(), "POST", "/generate-patients", bytes.NewReader(bodyBytes))
+	if err != nil {
+		http.Error(w, "Failed to create internal API request", http.StatusInternalServerError)
+		return
+	}
+
+	// We need a "dummy" ResponseWriter to capture the API's response
+	// In this case, we only care about the status code, so a simple one will do.
+	// httptest.NewRecorder() is perfect for this.
+	apiRecorder := httptest.NewRecorder()
+
+	// Directly call the API handler
+	p.api.RunSyntheaGeneration(apiRecorder, apiReq)
+
+	// Check the result from the API call
+	if apiRecorder.Code >= 400 {
+		// Something went wrong. For now, just log it and show a generic error.
+		// A more robust implementation would pass the error message to the template.
+		log.Printf("Internal API call to RunSyntheaGeneration failed with status %d. Body: %s", apiRecorder.Code, apiRecorder.Body.String())
+		http.Error(w, "Failed to create generation job.", http.StatusInternalServerError)
+		return
+	}
+
+	// If the API call was successful, redirect to the jobs list
+	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
+}
+
+// Helper functions to convert form values to pointers for the SyntheaParams struct
+func toIntPtr(s string) *int {
+	if s == "" {
+		return nil
+	}
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return nil
+	}
+	return &i
+}
+
+func toStringPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmplName string, pageTitle string, data interface{}) {

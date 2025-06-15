@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MediSynth-io/medisynth/internal/api"
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/go-chi/chi/v5"
@@ -19,9 +20,10 @@ import (
 type Portal struct {
 	templates map[string]*template.Template
 	config    *config.Config
+	api       *api.Api
 }
 
-func New(cfg *config.Config) (*Portal, error) {
+func New(cfg *config.Config, api *api.Api) (*Portal, error) {
 	templates := make(map[string]*template.Template)
 
 	// Path to the templates directory
@@ -56,6 +58,7 @@ func New(cfg *config.Config) (*Portal, error) {
 	return &Portal{
 		templates: templates,
 		config:    cfg,
+		api:       api,
 	}, nil
 }
 
@@ -100,6 +103,8 @@ func (p *Portal) Routes() http.Handler {
 
 		r.Get("/dashboard", p.handleDashboard)
 		r.Get("/jobs", p.handleJobs)
+		r.Get("/jobs/new", p.handleNewJob)
+		r.Post("/jobs/new", p.handleCreateJob)
 
 		// Token management routes
 		r.Route("/tokens", func(r chi.Router) {
@@ -141,30 +146,27 @@ func (p *Portal) requireAuth(next http.Handler) http.Handler {
 
 		log.Printf("[AUTH] Found session cookie, length: %d", len(cookie.Value))
 
-		session, err := auth.ValidateSession(cookie.Value)
+		userID, err := auth.ValidateSession(cookie.Value)
 		if err != nil {
 			log.Printf("[AUTH] Session validation failed: %v", err)
-			if err == auth.ErrSessionExpired {
-				log.Printf("[AUTH] Session expired, clearing cookie")
-				// Clear expired session cookie
-				http.SetCookie(w, &http.Cookie{
-					Name:     "session",
-					Value:    "",
-					Path:     "/",
-					Domain:   p.config.DomainPortal,
-					HttpOnly: true,
-					Secure:   p.config.DomainSecure,
-					Expires:  time.Unix(0, 0),
-					SameSite: http.SameSiteStrictMode,
-				})
-			}
+			// Clear invalid session cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:     "session",
+				Value:    "",
+				Path:     "/",
+				Domain:   p.config.DomainPortal,
+				HttpOnly: true,
+				Secure:   p.config.DomainSecure,
+				Expires:  time.Unix(0, 0),
+				SameSite: http.SameSiteStrictMode,
+			})
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		log.Printf("[AUTH] Session validation successful for user: %s", session.UserID)
+		log.Printf("[AUTH] Session validation successful for user: %s", userID)
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userID", session.UserID)
+		ctx = context.WithValue(ctx, "userID", userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

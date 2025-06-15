@@ -104,3 +104,31 @@ func generateRandomToken() (string, error) {
 	}
 	return base64.URLEncoding.EncodeToString(tokenBytes), nil
 }
+
+// CreateSession creates a new session for a user
+func CreateSession(userID string) (string, error) {
+	token, err := generateRandomToken()
+	if err != nil {
+		return "", err
+	}
+	expiresAt := time.Now().Add(24 * time.Hour)
+	err = dataStore.CreateSession(userID, token, expiresAt)
+	if err != nil {
+		return "", err
+	}
+	return token, nil
+}
+
+// ValidateSession validates a session token and returns the user ID
+func ValidateSession(token string) (string, error) {
+	session, err := dataStore.ValidateSession(token)
+	if err != nil {
+		return "", err
+	}
+	return session.UserID, nil
+}
+
+// DeleteSession deletes a user's session
+func DeleteSession(token string) error {
+	return dataStore.DeleteSession(token)
+}

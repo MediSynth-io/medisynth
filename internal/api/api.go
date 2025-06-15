@@ -450,3 +450,100 @@ func (api *Api) ListJobFilesHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(files)
 }
+
+// --- Token Handlers ---
+
+func (api *Api) CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in token", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" {
+		http.Error(w, "Token name is required", http.StatusBadRequest)
+		return
+	}
+
+	token, err := auth.CreateToken(userID, req.Name)
+	if err != nil {
+		http.Error(w, "Failed to create token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(token)
+}
+
+func (api *Api) ListTokensHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in token", http.StatusUnauthorized)
+		return
+	}
+
+	tokens, err := auth.ListTokens(userID)
+	if err != nil {
+		http.Error(w, "Failed to list tokens", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(tokens)
+}
+
+func (api *Api) DeleteTokenHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in token", http.StatusUnauthorized)
+		return
+	}
+	tokenID := chi.URLParam(r, "tokenID")
+
+	// TODO: should we also validate the user owns the token before deleting?
+	// The store method seems to require userID, which is good.
+	if err := auth.DeleteToken(userID, tokenID); err != nil {
+		http.Error(w, "Failed to delete token", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// --- Middleware ---
+
+func (api *Api) TokenAuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Authorization header required", http.StatusUnauthorized)
+			return
+		}
+
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+			http.Error(w, "Authorization header format must be Bearer {token}", http.StatusUnauthorized)
+			return
+		}
+
+		tokenStr := parts[1]
+		token, err := auth.ValidateToken(tokenStr)
+		if err != nil {
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		// Add user ID to context
+		ctx := context.WithValue(r.Context(), "userID", token.UserID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}

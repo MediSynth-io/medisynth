@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -398,7 +399,7 @@ func GetUserByID(id string) (*models.User, error) {
 }
 
 // CreateToken creates a new API token
-func CreateToken(userID string, name, token string, expiresAt *time.Time) (*models.Token, error) {
+func CreateToken(userID, name, token string, expiresAt *time.Time) (*models.Token, error) {
 	t := &models.Token{
 		UserID:    userID,
 		Token:     token,
@@ -497,60 +498,32 @@ func GetUserTokens(userID string) ([]*models.Token, error) {
 }
 
 // CreateSession creates a new session for a user
-func CreateSession(userID string, token string, expiresAt time.Time) (*models.Session, error) {
-	session := &models.Session{
-		UserID:    userID,
-		Token:     token,
-		ExpiresAt: expiresAt,
-	}
-
-	if dbType == "postgres" {
-		err := dbConn.QueryRow(
-			"INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING id, created_at",
-			session.UserID, session.Token, session.ExpiresAt,
-		).Scan(&session.ID, &session.CreatedAt)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		session.ID = GenerateID()
-		session.CreatedAt = time.Now()
-		_, err := dbConn.Exec(
-			"INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-			session.ID, session.UserID, session.Token, session.CreatedAt, session.ExpiresAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return session, nil
+func CreateSession(userID string, token string, expiresAt time.Time) error {
+	query := `INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)`
+	_, err := dbConn.Exec(query, GenerateID(), userID, token, expiresAt)
+	return err
 }
 
-// GetSessionByToken retrieves a session by its token
-func GetSessionByToken(token string) (*models.Session, error) {
-	session := &models.Session{}
-	var query string
-	if dbType == "postgres" {
-		query = "SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = $1"
-	} else {
-		query = "SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = ?"
-	}
+// ValidateSession retrieves a user by session token
+func ValidateSession(token string) (*models.Session, error) {
+	var session models.Session
+	query := `SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = $1`
 	err := dbConn.QueryRow(query, token).Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
-	return session, nil
+	// Check for expiration
+	if session.ExpiresAt.Before(time.Now()) {
+		// Optionally, delete the expired session
+		DeleteSession(token)
+		return nil, errors.New("session expired")
+	}
+	return &session, nil
 }
 
-// DeleteSession deletes a session
+// DeleteSession deletes a session by its token
 func DeleteSession(token string) error {
-	var query string
-	if dbType == "postgres" {
-		query = "DELETE FROM sessions WHERE token = $1"
-	} else {
-		query = "DELETE FROM sessions WHERE token = ?"
-	}
+	query := `DELETE FROM sessions WHERE token = $1`
 	_, err := dbConn.Exec(query, token)
 	return err
 }

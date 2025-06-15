@@ -44,3 +44,18 @@ func (s *Store) DeleteToken(userID string, tokenID string) error {
 func (s *Store) GetUserTokens(userID string) ([]*models.Token, error) {
 	return database.GetUserTokens(userID)
 }
+
+// CreateSession creates a new session
+func (s *Store) CreateSession(userID string, token string, expiresAt time.Time) error {
+	return database.CreateSession(userID, token, expiresAt)
+}
+
+// ValidateSession validates a session token
+func (s *Store) ValidateSession(token string) (*models.Session, error) {
+	return database.ValidateSession(token)
+}
+
+// DeleteSession deletes a session
+func (s *Store) DeleteSession(token string) error {
+	return database.DeleteSession(token)
+}
