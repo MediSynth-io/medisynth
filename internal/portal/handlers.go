@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"strings"
 	"time"
@@ -276,39 +275,48 @@ func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		OutputFormat: toStringPtr(r.FormValue("outputFormat")),
 	}
 
-	// Marshal the params to a JSON byte slice
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
-		http.Error(w, "Failed to create job request", http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to marshal job params: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// Create a new simulated request for the API handler
-	// We pass the portal's request context, which includes the authenticated userID
-	apiReq, err := http.NewRequestWithContext(r.Context(), "POST", "/generate-patients", bytes.NewReader(bodyBytes))
+	// The API service is expected to be available within the cluster
+	// at a service name like 'medisynth-api' on its container port.
+	apiURL := "http://medisynth-api:8081/generate-patients"
+
+	// Create the request to the API service
+	apiReq, err := http.NewRequestWithContext(r.Context(), "POST", apiURL, bytes.NewReader(bodyBytes))
 	if err != nil {
-		http.Error(w, "Failed to create internal API request", http.StatusInternalServerError)
+		log.Printf("ERROR: Failed to create API request: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// We need a "dummy" ResponseWriter to capture the API's response
-	// In this case, we only care about the status code, so a simple one will do.
-	// httptest.NewRecorder() is perfect for this.
-	apiRecorder := httptest.NewRecorder()
+	// Forward the user's session cookie for authentication
+	if cookie, err := r.Cookie("session"); err == nil {
+		apiReq.AddCookie(cookie)
+	}
 
-	// Directly call the API handler
-	p.api.RunSyntheaGeneration(apiRecorder, apiReq)
+	apiReq.Header.Set("Content-Type", "application/json")
 
-	// Check the result from the API call
-	if apiRecorder.Code >= 400 {
-		// Something went wrong. For now, just log it and show a generic error.
-		// A more robust implementation would pass the error message to the template.
-		log.Printf("Internal API call to RunSyntheaGeneration failed with status %d. Body: %s", apiRecorder.Code, apiRecorder.Body.String())
+	// Execute the request
+	client := &http.Client{}
+	apiRes, err := client.Do(apiReq)
+	if err != nil {
+		log.Printf("ERROR: Failed to call API service: %v", err)
+		http.Error(w, "Failed to start job. Could not contact API service.", http.StatusInternalServerError)
+		return
+	}
+	defer apiRes.Body.Close()
+
+	if apiRes.StatusCode >= 400 {
+		log.Printf("ERROR: API service returned status %d", apiRes.StatusCode)
 		http.Error(w, "Failed to create generation job.", http.StatusInternalServerError)
 		return
 	}
 
-	// If the API call was successful, redirect to the jobs list
 	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
 }
 

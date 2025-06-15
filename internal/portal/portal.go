@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/MediSynth-io/medisynth/internal/api"
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/go-chi/chi/v5"
@@ -20,10 +19,9 @@ import (
 type Portal struct {
 	templates map[string]*template.Template
 	config    *config.Config
-	api       *api.Api
 }
 
-func New(cfg *config.Config, api *api.Api) (*Portal, error) {
+func New(cfg *config.Config) (*Portal, error) {
 	templates := make(map[string]*template.Template)
 
 	// Path to the templates directory
@@ -58,7 +56,6 @@ func New(cfg *config.Config, api *api.Api) (*Portal, error) {
 	return &Portal{
 		templates: templates,
 		config:    cfg,
-		api:       api,
 	}, nil
 }
 
