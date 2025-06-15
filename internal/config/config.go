@@ -89,10 +89,8 @@ type DomainsConfig struct {
 // LoadConfig loads the configuration from environment variables.
 func LoadConfig() (*Config, error) {
 	v := viper.New()
-	v.AutomaticEnv()
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Set defaults for all config variables
+	// Set defaults first
 	v.SetDefault("API_PORT", 8081)
 	v.SetDefault("API_URL", "https://api.medisynth.io")
 	v.SetDefault("API_INTERNAL_URL", "http://medisynth-api-svc:8081")
@@ -107,7 +105,7 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("DB_NAME", "")
 	v.SetDefault("DB_USER", "")
 	v.SetDefault("DB_PASSWORD", "")
-	v.SetDefault("DB_SSL_MODE", "")
+	v.SetDefault("DB_SSL_MODE", "disable")
 	v.SetDefault("DB_MAX_CONNECTIONS", 10)
 	v.SetDefault("DB_MAX_IDLE_CONNECTIONS", 5)
 	v.SetDefault("DB_CONNECTION_MAX_LIFETIME", "0")
@@ -121,15 +119,18 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("S3_SECRET_ACCESS_KEY", "")
 	v.SetDefault("S3_USE_SSL", true)
 	v.SetDefault("ADMIN_EMAILS", "")
-	v.SetDefault("BITCOIN_ADDRESS", "") // This is the key field
+	v.SetDefault("BITCOIN_ADDRESS", "")
+
+	// Then, tell Viper to read environment variables
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Viper's unmarshaling of comma-separated strings from env vars can be unreliable.
-	// We handle it manually here to ensure it works correctly.
+	// Manually handle comma-separated strings
 	adminEmailsStr := v.GetString("ADMIN_EMAILS")
 	if adminEmailsStr != "" {
 		cfg.AdminEmails = strings.Split(adminEmailsStr, ",")
@@ -139,11 +140,14 @@ func LoadConfig() (*Config, error) {
 	}
 
 	// Final verification log
-	log.Printf("Configuration loaded. Admin emails: %d", len(cfg.AdminEmails))
+	log.Printf("Configuration loaded successfully.")
 	if cfg.BitcoinAddress != "" {
-		log.Printf("Bitcoin address loaded successfully: %s", cfg.BitcoinAddress)
+		log.Printf("Bitcoin address loaded from env: %s", cfg.BitcoinAddress)
 	} else {
 		log.Printf("CRITICAL WARNING: BITCOIN_ADDRESS is not set. Payment functionality will fail.")
+	}
+	if cfg.DatabaseType == "postgres" {
+		log.Printf("Postgres host loaded from env: %s", cfg.DatabaseHost)
 	}
 
 	return &cfg, nil

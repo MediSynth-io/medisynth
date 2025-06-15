@@ -21,68 +21,39 @@ var dbType string
 
 // Init initializes the database connection and schema
 func Init(cfg *config.Config) error {
-	if dbConn != nil {
-		return nil
-	}
-
-	log.Printf("=== DATABASE INITIALIZATION DEBUG ===")
-	log.Printf("Database type: %s", cfg.DatabaseType)
-
-	var db *sql.DB
 	var err error
+	dbType = cfg.DatabaseType
+	log.Printf("Initializing database of type: %s", dbType)
 
-	switch cfg.DatabaseType {
+	switch dbType {
 	case "postgres":
-		db, err = initPostgreSQL(cfg)
-	case "sqlite", "":
-		db, err = initSQLite(cfg)
+		dbConn, err = initPostgreSQL(cfg)
+		if err != nil {
+			log.Fatalf("CRITICAL: Failed to initialize PostgreSQL. Application cannot start. Error: %v", err)
+			return err // Will not be reached due to log.Fatalf, but good practice
+		}
+	case "sqlite":
+		dbConn, err = initSQLite(cfg)
+		if err != nil {
+			log.Fatalf("CRITICAL: Failed to initialize SQLite. Application cannot start. Error: %v", err)
+			return err
+		}
 	default:
-		return fmt.Errorf("unsupported database type: %s", cfg.DatabaseType)
+		return fmt.Errorf("unsupported database type: %s", dbType)
 	}
 
-	if err != nil {
+	// Verify the connection is alive
+	if err = dbConn.Ping(); err != nil {
+		log.Fatalf("CRITICAL: Could not connect to the database. Application cannot start. Error: %v", err)
 		return err
 	}
 
-	// Test the connection
-	if err := db.Ping(); err != nil {
-		db.Close()
-		return fmt.Errorf("failed to ping database: %v", err)
-	}
+	log.Println("Database connection established successfully.")
 
-	// Check existing data BEFORE schema initialization
-	log.Printf("Checking existing database contents...")
-	if err := debugExistingData(db); err != nil {
-		log.Printf("Warning: Could not check existing data: %v", err)
-	}
-
-	// Run migrations
-	log.Printf("Running database migrations")
-	if err = RunMigrations(db, cfg.DatabaseType); err != nil {
-		db.Close()
-		return fmt.Errorf("failed to run migrations: %v", err)
-	}
-
-	// Check data AFTER schema initialization
-	log.Printf("Checking database contents after schema init...")
-	if err := debugExistingData(db); err != nil {
-		log.Printf("Warning: Could not check data after init: %v", err)
-	}
-
-	dbConn = db
-	dbType = cfg.DatabaseType
-	log.Printf("=== DATABASE INITIALIZED SUCCESSFULLY ===")
-	log.Printf("Database type set to: %s", dbType)
-	log.Printf("Database connection established: %v", dbConn != nil)
-
-	// Test basic database functionality
-	var testCount int
-	testQuery := "SELECT COUNT(*) FROM sessions"
-	err = dbConn.QueryRow(testQuery).Scan(&testCount)
-	if err != nil {
-		log.Printf("WARNING: Could not query sessions table: %v", err)
-	} else {
-		log.Printf("Sessions table accessible, current count: %d", testCount)
+	// Run database migrations
+	if err = RunMigrations(dbConn, dbType); err != nil {
+		log.Fatalf("CRITICAL: Database migrations failed. Application cannot start. Error: %v", err)
+		return err
 	}
 
 	return nil

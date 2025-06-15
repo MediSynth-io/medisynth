@@ -27,6 +27,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: medisynth-portal-config
+            - configMapRef:
+                name: medisynth-postgres-config
             - secretRef:
                 name: medisynth-secrets
             - secretRef:
