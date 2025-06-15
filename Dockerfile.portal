@@ -1,0 +1,14 @@
+# Use Go 1.23 for the build stage
+FROM golang:1.23-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN go build -o /medisynth-portal ./cmd/portal/main.go
+
+# Use a minimal alpine image for the final stage
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /medisynth-portal /app/medisynth-portal
+COPY templates/ /app/templates/
+COPY static/ /app/static/
+COPY app.yml app.prod.yml ./
+CMD ["./medisynth-portal"] 

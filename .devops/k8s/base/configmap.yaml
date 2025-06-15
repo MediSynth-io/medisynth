@@ -4,7 +4,7 @@ metadata:
   name: medisynth-config
   namespace: medisynth-io
 data:
-  app.yml: |
+  app.prod.yml: |
     apiPort: 8081
     database:
       path: /data/medisynth.db
@@ -15,4 +15,4 @@ data:
     domains:
       portal: portal.medisynth.io
       api: api.medisynth.io
-      secure: true 
+      secure: true

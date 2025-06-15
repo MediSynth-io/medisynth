@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/MediSynth-io/medisynth/internal/config"
-	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/portal"
 )
 
@@ -19,11 +18,6 @@ func initializePortal(configPath string) (http.Handler, error) {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return nil, err
-	}
-
-	// Initialize the database connection
-	if err := database.Init(cfg); err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %v", err)
 	}
 
 	portal, err := portal.New(cfg)

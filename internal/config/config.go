@@ -9,8 +9,10 @@ import (
 )
 
 type Config struct {
-	APIPort  int `yaml:"apiPort"`
-	Database struct {
+	APIPort        int    `yaml:"apiPort"`
+	APIURL         string `yaml:"apiURL"`
+	APIInternalURL string `yaml:"apiInternalURL"`
+	Database       struct {
 		Path       string `yaml:"path"`
 		SocketPath string `yaml:"socketPath"`
 		WALMode    bool   `yaml:"walMode"`
@@ -88,6 +90,18 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Domains.API == "" {
 		cfg.Domains.API = "api.medisynth.io" // Default to production domain
 		log.Println("API domain not specified, using default api.medisynth.io")
+	}
+
+	if cfg.APIURL == "" {
+		proto := "http"
+		if cfg.Domains.Secure {
+			proto = "https"
+		}
+		cfg.APIURL = proto + "://" + cfg.Domains.API
+	}
+
+	if cfg.APIInternalURL == "" {
+		cfg.APIInternalURL = "http://medisynth-api-svc:8081" // Default to k8s service name
 	}
 
 	// Only set secure default if it wasn't specified in the config file

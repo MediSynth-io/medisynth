@@ -1,0 +1,12 @@
+# Use Go 1.23 for the build stage
+FROM golang:1.23-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN go build -o /medisynth-api ./cmd/api/main.go
+
+# Use a minimal alpine image for the final stage
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /medisynth-api /app/medisynth-api
+COPY app.yml app.prod.yml ./
+CMD ["./medisynth-api"] 
