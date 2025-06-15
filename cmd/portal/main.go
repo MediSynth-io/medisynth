@@ -7,18 +7,34 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/portal"
+	"github.com/MediSynth-io/medisynth/internal/store"
 )
 
 const version = "0.0.1"
 
 func initializePortal() (http.Handler, error) {
+	// Load configuration
 	cfg, err := config.Init()
 	if err != nil {
 		return nil, err
 	}
 
+	// Initialize database
+	if err := database.Init(cfg); err != nil {
+		return nil, err
+	}
+
+	// Initialize store
+	dataStore := store.New()
+
+	// Initialize auth with store
+	auth.SetStore(dataStore)
+
+	// Initialize portal
 	portal, err := portal.New(cfg)
 	if err != nil {
 		return nil, err
