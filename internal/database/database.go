@@ -1188,6 +1188,8 @@ func CreatePayment(payment *models.Payment) error {
 
 // UpdateOrderBitcoinData updates an order with Bitcoin amount and QR code data
 func UpdateOrderBitcoinData(orderID string, amountBTC float64, qrCodeData string) error {
+	log.Printf("[DB] Updating order %s with Bitcoin data: amount=%.8f BTC, qr_code_length=%d", orderID, amountBTC, len(qrCodeData))
+
 	var query string
 	now := time.Now()
 
@@ -1205,8 +1207,20 @@ func UpdateOrderBitcoinData(orderID string, amountBTC float64, qrCodeData string
 				WHERE id = ?`
 	}
 
-	_, err := dbConn.Exec(query, amountBTC, qrCodeData, now, orderID)
-	return err
+	result, err := dbConn.Exec(query, amountBTC, qrCodeData, now, orderID)
+	if err != nil {
+		log.Printf("[DB] Error updating order %s with Bitcoin data: %v", orderID, err)
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("[DB] Error getting rows affected for order %s: %v", orderID, err)
+	} else {
+		log.Printf("[DB] Successfully updated order %s with Bitcoin data, rows affected: %d", orderID, rowsAffected)
+	}
+
+	return nil
 }
 
 // debugExistingData checks and logs existing database contents
