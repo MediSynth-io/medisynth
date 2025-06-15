@@ -18,7 +18,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      services: ${{ steps.filter.outputs.services }}
+      services: ${{ steps.filter.outputs.services || '[]' }}
     steps:
       - uses: actions/checkout@v3
       - uses: dorny/paths-filter@v2
@@ -75,7 +75,7 @@ jobs:
       - name: Set up kubeconfig
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
 
       - name: Rollout deployments
