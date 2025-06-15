@@ -100,12 +100,12 @@ func DomainMiddleware(portalHandler, apiHandler http.Handler, config *config.Con
 			}
 
 			// Try exact domain matches first
-			if strings.HasPrefix(host, config.Domains.Portal) {
+			if strings.HasPrefix(host, config.DomainPortal) {
 				portalHandler.ServeHTTP(w, r)
 				return
 			}
 
-			if strings.HasPrefix(host, config.Domains.API) {
+			if strings.HasPrefix(host, config.DomainAPI) {
 				apiHandler.ServeHTTP(w, r)
 				return
 			}

@@ -133,9 +133,9 @@ func (p *Portal) requireAuth(next http.Handler) http.Handler {
 					Name:     "session",
 					Value:    "",
 					Path:     "/",
-					Domain:   p.config.Domains.Portal,
+					Domain:   p.config.DomainPortal,
 					HttpOnly: true,
-					Secure:   p.config.Domains.Secure,
+					Secure:   p.config.DomainSecure,
 					Expires:  time.Unix(0, 0),
 					SameSite: http.SameSiteStrictMode,
 				})
