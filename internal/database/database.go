@@ -15,6 +15,7 @@ import (
 )
 
 var dbConn *sql.DB
+var dbType string
 
 // Init initializes the database connection and schema
 func Init(cfg *config.Config) error {
@@ -67,6 +68,7 @@ func Init(cfg *config.Config) error {
 	}
 
 	dbConn = db
+	dbType = cfg.DatabaseType
 	log.Printf("=== DATABASE INITIALIZED SUCCESSFULLY ===")
 	return nil
 }
@@ -287,21 +289,34 @@ func checkWritePermissions(dir string) error {
 
 // CreateUser creates a new user
 func CreateUser(email, password string) (*models.User, error) {
-	now := time.Now()
 	user := &models.User{
-		ID:        generateID(),
-		Email:     email,
-		Password:  password,
-		CreatedAt: now,
-		UpdatedAt: now,
+		Email:    email,
+		Password: password,
 	}
 
-	_, err := dbConn.Exec(
-		"INSERT INTO users (id, email, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
-		user.ID, user.Email, user.Password, user.CreatedAt, user.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
+	if dbType == "postgres" {
+		// PostgreSQL with UUID auto-generation
+		err := dbConn.QueryRow(
+			"INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, created_at, updated_at",
+			user.Email, user.Password,
+		).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// SQLite with manual ID generation
+		now := time.Now()
+		user.ID = generateID()
+		user.CreatedAt = now
+		user.UpdatedAt = now
+
+		_, err := dbConn.Exec(
+			"INSERT INTO users (id, email, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+			user.ID, user.Email, user.Password, user.CreatedAt, user.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return user, nil
@@ -310,10 +325,20 @@ func CreateUser(email, password string) (*models.User, error) {
 // GetUserByEmail retrieves a user by email
 func GetUserByEmail(email string) (*models.User, error) {
 	user := &models.User{}
-	err := dbConn.QueryRow(
-		"SELECT id, email, password, created_at, updated_at FROM users WHERE email = ?",
-		email,
-	).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	var err error
+
+	if dbType == "postgres" {
+		err = dbConn.QueryRow(
+			"SELECT id, email, password, created_at, updated_at FROM users WHERE email = $1",
+			email,
+		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	} else {
+		err = dbConn.QueryRow(
+			"SELECT id, email, password, created_at, updated_at FROM users WHERE email = ?",
+			email,
+		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -323,10 +348,20 @@ func GetUserByEmail(email string) (*models.User, error) {
 // GetUserByID retrieves a user by their ID
 func GetUserByID(id string) (*models.User, error) {
 	user := &models.User{}
-	err := dbConn.QueryRow(
-		"SELECT id, email, password, created_at, updated_at FROM users WHERE id = ?",
-		id,
-	).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	var err error
+
+	if dbType == "postgres" {
+		err = dbConn.QueryRow(
+			"SELECT id, email, password, created_at, updated_at FROM users WHERE id = $1",
+			id,
+		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	} else {
+		err = dbConn.QueryRow(
+			"SELECT id, email, password, created_at, updated_at FROM users WHERE id = ?",
+			id,
+		).Scan(&user.ID, &user.Email, &user.Password, &user.CreatedAt, &user.UpdatedAt)
+	}
+
 	if err != nil {
 		return nil, err
 	}
