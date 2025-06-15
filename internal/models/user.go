@@ -1,4 +1,8 @@
-// User represents a user account
+package models
+
+import "time"
+
+// User represents a user account in the database
 type User struct {
 	ID                 string    `json:"id" db:"id"`
 	Email              string    `json:"email" db:"email"`
@@ -7,4 +11,4 @@ type User struct {
 	ForcePasswordReset bool      `json:"force_password_reset" db:"force_password_reset"`
 	CreatedAt          time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at" db:"updated_at"`
-} 
+}
