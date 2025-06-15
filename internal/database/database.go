@@ -56,11 +56,11 @@ func Init(cfg *config.Config) error {
 		log.Printf("Warning: Could not check existing data: %v", err)
 	}
 
-	// Initialize schema
-	log.Printf("Initializing database schema")
-	if err = initSchema(db, cfg.DatabaseType); err != nil {
+	// Run migrations
+	log.Printf("Running database migrations")
+	if err = RunMigrations(db, cfg.DatabaseType); err != nil {
 		db.Close()
-		return fmt.Errorf("failed to initialize schema: %v", err)
+		return fmt.Errorf("failed to run migrations: %v", err)
 	}
 
 	// Check data AFTER schema initialization
