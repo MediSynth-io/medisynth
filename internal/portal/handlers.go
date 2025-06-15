@@ -704,7 +704,7 @@ func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		"RecentOrders": recentOrders,
 	}
 
-	p.renderAdminTemplate(w, r, "admin-dashboard.html", "Admin Dashboard", data)
+	p.renderAdminTemplate(w, r, "admin-dashboard.html", "Dashboard", data)
 }
 
 func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
@@ -715,7 +715,7 @@ func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to retrieve users.", http.StatusInternalServerError)
 		return
 	}
-	p.renderAdminTemplate(w, r, "admin-users.html", "User Management", map[string]interface{}{
+	p.renderAdminTemplate(w, r, "admin-users.html", "Users", map[string]interface{}{
 		"Users": users,
 	})
 }
@@ -770,7 +770,7 @@ func (p *Portal) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 		"Orders": orders,
 	}
 
-	p.renderAdminTemplate(w, r, "admin-orders.html", "Order Management", data)
+	p.renderAdminTemplate(w, r, "admin-orders.html", "Orders", data)
 }
 
 func (p *Portal) handleAdminPayments(w http.ResponseWriter, r *http.Request) {

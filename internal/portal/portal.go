@@ -38,52 +38,43 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func New(cfg *config.Config) (*Portal, error) {
+func loadTemplates() (map[string]*template.Template, error) {
 	templates := make(map[string]*template.Template)
 	templateDir := "templates/portal"
 
-	// Base templates
-	baseTmpl, err := template.New("base.html").Funcs(funcMap).ParseFiles(filepath.Join(templateDir, "base.html"))
-	if err != nil {
-		return nil, err
-	}
-	adminBaseTmpl, err := template.New("admin-base.html").Funcs(funcMap).ParseFiles(filepath.Join(templateDir, "admin-base.html"))
-	if err != nil {
-		return nil, err
-	}
-
-	// Page templates
 	pages, err := fs.Glob(os.DirFS(templateDir), "*.html")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to glob templates: %w", err)
 	}
 
 	for _, page := range pages {
-		if strings.HasSuffix(page, "base.html") {
-			continue // Skip base templates
-		}
+		name := filepath.Base(page)
 
-		var base *template.Template
-		if strings.HasPrefix(page, "admin-") {
-			base = adminBaseTmpl
-		} else {
-			base = baseTmpl
-		}
+		// Create a new template with the base name and func map.
+		ts := template.New(name).Funcs(funcMap)
 
-		tmpl, err := base.Clone()
+		// Parse the files, always including the base layouts.
+		ts, err := ts.ParseFiles(
+			filepath.Join(templateDir, "base.html"),
+			filepath.Join(templateDir, "admin-base.html"),
+			filepath.Join(templateDir, page),
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse template %s: %w", page, err)
 		}
-
-		tmpl, err = tmpl.ParseFiles(filepath.Join(templateDir, page))
-		if err != nil {
-			log.Printf("Error parsing template %s: %v", page, err)
-			return nil, err
-		}
-		templates[page] = tmpl
+		templates[page] = ts
 	}
 
-	log.Printf("Successfully loaded templates")
+	log.Printf("Successfully loaded %d templates", len(templates))
+	return templates, nil
+}
+
+func New(cfg *config.Config) (*Portal, error) {
+	templates, err := loadTemplates()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load templates: %w", err)
+	}
+
 	return &Portal{
 		templates: templates,
 		config:    cfg,
@@ -178,6 +169,7 @@ func (p *Portal) Routes() http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(p.requireAuth)
 		r.Use(p.requireAdmin)
+		r.Use(p.adminNavMiddleware)
 
 		r.Get("/admin", p.handleAdminDashboard)
 		r.Get("/admin/users", p.handleAdminUsers)
@@ -280,5 +272,21 @@ func (p *Portal) requireAdmin(next http.Handler) http.Handler {
 
 		logRequest(r, "ADMIN_AUTH", "Admin access granted")
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (p *Portal) adminNavMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		nav := []struct {
+			Name string
+			Path string
+			Icon string // (Optional) for future use
+		}{
+			{"Dashboard", "/admin/dashboard", ""},
+			{"Users", "/admin/users", ""},
+			{"Orders", "/admin/orders", ""},
+		}
+		ctx := context.WithValue(r.Context(), "adminNav", nav)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
