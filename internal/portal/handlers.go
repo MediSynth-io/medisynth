@@ -400,7 +400,7 @@ func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmplName
 	}
 
 	log.Printf("Executing template %s with data keys: %v", tmplName, getMapKeys(templateData))
-	err := ts.ExecuteTemplate(w, "base", templateData)
+	err := ts.ExecuteTemplate(w, "base.html", templateData)
 	if err != nil {
 		log.Printf("Error rendering template %s: %v", tmplName, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
