@@ -13,34 +13,6 @@ import (
 
 var dbConn *sql.DB
 
-// User represents a user in the system
-type User struct {
-	ID        int64     `json:"id"`
-	Email     string    `json:"email"`
-	Password  string    `json:"-"` // Password is never exposed in JSON
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// Token represents an API token
-type Token struct {
-	ID        string     `json:"id"`
-	UserID    int64      `json:"user_id"`
-	Token     string     `json:"token"`
-	Name      string     `json:"name"`
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-}
-
-// Session represents a user session
-type Session struct {
-	ID        string    `json:"id"`
-	UserID    int64     `json:"user_id"`
-	Token     string    `json:"token"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
-
 // Init initializes the database connection and schema
 func Init(cfg *config.Config) error {
 	if dbConn != nil {
