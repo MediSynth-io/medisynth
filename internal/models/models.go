@@ -6,9 +6,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// User represents a system user
+// User represents a user in the system
 type User struct {
-	ID        int64     `json:"id"`
+	ID        string    `json:"id"`
 	Email     string    `json:"email"`
 	Password  string    `json:"-"` // Password is never exposed in JSON
 	CreatedAt time.Time `json:"created_at"`
@@ -39,7 +39,7 @@ func (u *User) ValidatePassword(password string) bool {
 // Token represents an API token
 type Token struct {
 	ID        string     `json:"id"`
-	UserID    int64      `json:"user_id"`
+	UserID    string     `json:"user_id"`
 	Token     string     `json:"token"`
 	Name      string     `json:"name"`
 	CreatedAt time.Time  `json:"created_at"`
@@ -49,7 +49,7 @@ type Token struct {
 // Session represents a user session
 type Session struct {
 	ID        string    `json:"id"`
-	UserID    int64     `json:"user_id"`
+	UserID    string    `json:"user_id"`
 	Token     string    `json:"token"`
 	CreatedAt time.Time `json:"created_at"`
 	ExpiresAt time.Time `json:"expires_at"`

@@ -8,36 +8,9 @@ import (
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/models"
 	_ "github.com/mattn/go-sqlite3"
 )
-
-// User represents a user in the system
-type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Password  string    `json:"-"` // Password is never exposed in JSON
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// Token represents an API token
-type Token struct {
-	ID        string     `json:"id"`
-	UserID    string     `json:"user_id"`
-	Token     string     `json:"token"`
-	Name      string     `json:"name"`
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-}
-
-// Session represents a user session
-type Session struct {
-	ID        string    `json:"id"`
-	UserID    string    `json:"user_id"`
-	Token     string    `json:"token"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-}
 
 var dbConn *sql.DB
 
@@ -124,9 +97,9 @@ func createDataDir(dir string) error {
 }
 
 // CreateUser creates a new user
-func CreateUser(email, password string) (*User, error) {
+func CreateUser(email, password string) (*models.User, error) {
 	now := time.Now()
-	user := &User{
+	user := &models.User{
 		ID:        generateID(),
 		Email:     email,
 		Password:  password,
@@ -146,8 +119,8 @@ func CreateUser(email, password string) (*User, error) {
 }
 
 // GetUserByEmail retrieves a user by email
-func GetUserByEmail(email string) (*User, error) {
-	user := &User{}
+func GetUserByEmail(email string) (*models.User, error) {
+	user := &models.User{}
 	err := dbConn.QueryRow(
 		"SELECT id, email, password, created_at, updated_at FROM users WHERE email = ?",
 		email,
@@ -159,8 +132,8 @@ func GetUserByEmail(email string) (*User, error) {
 }
 
 // CreateToken creates a new API token
-func CreateToken(userID string, name, token string, expiresAt *time.Time) (*Token, error) {
-	t := &Token{
+func CreateToken(userID string, name, token string, expiresAt *time.Time) (*models.Token, error) {
+	t := &models.Token{
 		ID:        generateID(),
 		UserID:    userID,
 		Token:     token,
@@ -181,8 +154,8 @@ func CreateToken(userID string, name, token string, expiresAt *time.Time) (*Toke
 }
 
 // GetTokenByValue retrieves a token by its value
-func GetTokenByValue(token string) (*Token, error) {
-	t := &Token{}
+func GetTokenByValue(token string) (*models.Token, error) {
+	t := &models.Token{}
 	err := dbConn.QueryRow(
 		"SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE token = ?",
 		token,
@@ -212,7 +185,7 @@ func DeleteToken(userID string, tokenID string) error {
 }
 
 // GetUserTokens retrieves all tokens for a user
-func GetUserTokens(userID string) ([]*Token, error) {
+func GetUserTokens(userID string) ([]*models.Token, error) {
 	rows, err := dbConn.Query(
 		"SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE user_id = ?",
 		userID,
@@ -222,9 +195,9 @@ func GetUserTokens(userID string) ([]*Token, error) {
 	}
 	defer rows.Close()
 
-	var tokens []*Token
+	var tokens []*models.Token
 	for rows.Next() {
-		t := &Token{}
+		t := &models.Token{}
 		err := rows.Scan(&t.ID, &t.UserID, &t.Token, &t.Name, &t.CreatedAt, &t.ExpiresAt)
 		if err != nil {
 			return nil, err
