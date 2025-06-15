@@ -2,6 +2,7 @@ package portal
 
 import (
 	"context"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"log"
@@ -22,54 +23,55 @@ type Portal struct {
 	config    *config.Config
 }
 
+var funcMap = template.FuncMap{
+	"humanizeBytes": func(bytes int64) string {
+		if bytes < 1024 {
+			return fmt.Sprintf("%d B", bytes)
+		}
+		if bytes < 1024*1024 {
+			return fmt.Sprintf("%.2f KB", float64(bytes)/1024)
+		}
+		if bytes < 1024*1024*1024 {
+			return fmt.Sprintf("%.2f MB", float64(bytes)/(1024*1024))
+		}
+		return fmt.Sprintf("%.2f GB", float64(bytes)/(1024*1024*1024))
+	},
+}
+
 func New(cfg *config.Config) (*Portal, error) {
 	templates := make(map[string]*template.Template)
-
-	// Path to the templates directory
 	templateDir := "templates/portal"
 
-	// Find all the page templates
 	pages, err := fs.Glob(os.DirFS(templateDir), "*.html")
 	if err != nil {
-		log.Printf("Error finding templates: %v", err)
 		return nil, err
 	}
 
-	// For each page, parse it with the base and helper templates
+	baseTmpl := template.New("base.html").Funcs(funcMap)
+	baseTmpl, err = baseTmpl.ParseFiles(filepath.Join(templateDir, "base.html"))
+	if err != nil {
+		return nil, err
+	}
+
 	for _, page := range pages {
 		if page == "base.html" {
 			continue
 		}
 
-		// Create a new template with a function map
-		funcMap := template.FuncMap{
-			"div": func(a, b float64) float64 {
-				return a / b
-			},
+		tmpl, err := baseTmpl.Clone()
+		if err != nil {
+			return nil, err
 		}
 
-		ts, err := template.New(page).Funcs(funcMap).ParseFiles(
-			filepath.Join(templateDir, "base.html"),
-			filepath.Join(templateDir, page),
-		)
+		tmpl, err = tmpl.ParseFiles(filepath.Join(templateDir, page))
 		if err != nil {
 			log.Printf("Error parsing template %s: %v", page, err)
 			return nil, err
 		}
-
-		// Also parse our new helpers template if it exists
-		// This is a bit of a workaround for the way we are structuring templates
-		if _, err := os.Stat(filepath.Join(templateDir, "job-outputs.html")); err == nil {
-			if _, err := ts.ParseFiles(filepath.Join(templateDir, "job-outputs.html")); err != nil {
-				log.Printf("Error parsing helper template for %s: %v", page, err)
-			}
-		}
-
-		templates[page] = ts
+		templates[page] = tmpl
 	}
 
 	log.Printf("Successfully loaded templates")
-
 	return &Portal{
 		templates: templates,
 		config:    cfg,

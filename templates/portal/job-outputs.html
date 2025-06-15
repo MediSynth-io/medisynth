@@ -59,18 +59,4 @@
         </table>
     </div>
 </div>
-{{end}}
-
-{{define "extra_helpers"}}
-{{- func humanizeBytes(bytes int64) string -}}
-    {{- if lt bytes 1024 -}}
-        {{- printf "%d B" bytes -}}
-    {{- else if lt bytes 1048576 -}}
-        {{- printf "%.2f KB" (div (float64 bytes) 1024) -}}
-    {{- else if lt bytes 1073741824 -}}
-        {{- printf "%.2f MB" (div (float64 bytes) 1048576) -}}
-    {{- else -}}
-        {{- printf "%.2f GB" (div (float64 bytes) 1073741824) -}}
-    {{- end -}}
-{{- end -}}
 {{end}} 
