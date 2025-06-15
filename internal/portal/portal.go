@@ -93,6 +93,13 @@ func (p *Portal) Routes() http.Handler {
 	// Logout route
 	r.Get("/logout", p.handleLogout)
 
+	// Debug route to verify service is running
+	r.Get("/debug", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"service":"medisynth-portal","status":"running","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+	})
+
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(p.requireAuth)

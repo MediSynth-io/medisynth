@@ -13,6 +13,7 @@ spec:
       labels:
         app: medisynth-portal
         component: portal
+        tier: backend
     spec:
       imagePullSecrets:
         - name: ghcr-login-secret

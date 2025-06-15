@@ -5,8 +5,7 @@ metadata:
   namespace: medisynth-io
 spec:
   selector:
-    app: medisynth-io
-    tier: backend
+    app: medisynth-portal
     component: portal
   ports:
     - name: http
