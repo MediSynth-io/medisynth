@@ -72,6 +72,73 @@ func (p *Portal) handleDocumentation(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "documentation.html", "Documentation", map[string]interface{}{})
 }
 
+func (p *Portal) handleSwaggerProxy(w http.ResponseWriter, r *http.Request) {
+	// This creates an authenticated proxy to the API's Swagger UI
+	// Only authenticated portal users can access it
+
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Create API URL (assuming API runs on port 8081)
+	apiURL := "http://medisynth-api:8081" + r.URL.Path
+	if r.URL.RawQuery != "" {
+		apiURL += "?" + r.URL.RawQuery
+	}
+
+	// Create proxy request
+	proxyReq, err := http.NewRequest(r.Method, apiURL, r.Body)
+	if err != nil {
+		http.Error(w, "Failed to create proxy request", http.StatusInternalServerError)
+		return
+	}
+
+	// Copy headers from original request
+	for name, values := range r.Header {
+		for _, value := range values {
+			proxyReq.Header.Add(name, value)
+		}
+	}
+
+	// Forward the user's session cookie for API authentication
+	if cookie, err := r.Cookie("session"); err == nil {
+		proxyReq.AddCookie(cookie)
+	}
+
+	// Execute the proxy request
+	client := &http.Client{}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		http.Error(w, "Failed to proxy request", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Copy response headers
+	for name, values := range resp.Header {
+		for _, value := range values {
+			w.Header().Add(name, value)
+		}
+	}
+
+	// Set response status and copy body
+	w.WriteHeader(resp.StatusCode)
+
+	// Copy response body
+	buf := make([]byte, 32*1024) // 32KB buffer
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			w.Write(buf[:n])
+		}
+		if err != nil {
+			break
+		}
+	}
+}
+
 func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")

@@ -89,20 +89,16 @@ func (api *Api) setupRoutes() {
 		MaxAge:           300,
 	}))
 
-	// Root API info endpoint
+	// Public root endpoint (limited info)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"service": "MediSynth API",
-			"version": "v1.0.0",
-			"status":  "running",
-			"endpoints": map[string]string{
-				"health":   "/heartbeat",
-				"docs":     "/swagger/",
-				"generate": "/generate-patients",
-				"status":   "/generation-status/{jobID}",
-			},
+			"service":       "MediSynth API",
+			"version":       "v1.0.0",
+			"status":        "running",
+			"message":       "Authentication required for API endpoints",
+			"documentation": "Visit /swagger/ for API documentation",
 		})
 	})
 
@@ -118,6 +114,32 @@ func (api *Api) setupRoutes() {
 	// Protected API routes
 	r.Group(func(r chi.Router) {
 		r.Use(api.UnifiedAuthMiddleware)
+
+		// API Documentation (private)
+		r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"service": "MediSynth API",
+				"version": "v1.0.0",
+				"status":  "running",
+				"endpoints": map[string]string{
+					"health":   "/heartbeat",
+					"docs":     "/docs",
+					"swagger":  "/swagger/",
+					"generate": "/generate-patients",
+					"status":   "/generation-status/{jobID}",
+					"jobs":     "/jobs",
+					"tokens":   "/tokens",
+				},
+				"documentation": "Access /swagger/ for interactive API documentation",
+			})
+		})
+
+		// Swagger UI (private)
+		r.Handle("/swagger/*", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swagger-ui"))))
+
+		// Token management
 		r.Post("/tokens", api.CreateTokenHandler)
 		r.Get("/tokens", api.ListTokensHandler)
 		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
@@ -128,9 +150,6 @@ func (api *Api) setupRoutes() {
 		r.Get("/jobs", api.ListJobsHandler)
 		r.Get("/jobs/{jobID}/files", api.ListJobFilesHandler)
 	})
-
-	// Swagger UI
-	r.Handle("/swagger/*", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swagger-ui"))))
 }
 
 func (api *Api) Serve() {
