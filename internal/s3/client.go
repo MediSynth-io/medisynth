@@ -3,6 +3,8 @@ package s3
 import (
 	"context"
 	"log"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/config"
@@ -79,11 +81,32 @@ func (c *Client) ListFiles(ctx context.Context, prefix string) ([]models.JobFile
 
 		files = append(files, models.JobFile{
 			S3Key:    *object.Key,
-			Filename: *object.Key, // TODO: improve this
+			Filename: extractFilename(*object.Key),
 			Size:     size,
 			URL:      req.URL,
 		})
 	}
 
 	return files, nil
+}
+
+func extractFilename(s3Key string) string {
+	// Extract just the filename from the S3 key path
+	// For example: "synthea_output/job-123/fhir/Patient_123.json" -> "Patient_123.json"
+	filename := filepath.Base(s3Key)
+
+	// If it's still empty or just a path separator, use the last meaningful part
+	if filename == "." || filename == "/" || filename == "" {
+		parts := strings.Split(strings.Trim(s3Key, "/"), "/")
+		if len(parts) > 0 {
+			filename = parts[len(parts)-1]
+		}
+	}
+
+	// If we still don't have a good filename, use the full key
+	if filename == "" {
+		filename = s3Key
+	}
+
+	return filename
 }

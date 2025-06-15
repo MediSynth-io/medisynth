@@ -570,8 +570,18 @@ func (api *Api) DeleteTokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenID := chi.URLParam(r, "tokenID")
 
-	// TODO: should we also validate the user owns the token before deleting?
-	// The store method seems to require userID, which is good.
+	// Validate that the user owns the token before deleting
+	token, err := auth.ValidateToken(tokenID)
+	if err != nil {
+		http.Error(w, "Token not found", http.StatusNotFound)
+		return
+	}
+
+	if token.UserID != userID {
+		http.Error(w, "Forbidden: You can only delete your own tokens", http.StatusForbidden)
+		return
+	}
+
 	if err := auth.DeleteToken(userID, tokenID); err != nil {
 		http.Error(w, "Failed to delete token", http.StatusInternalServerError)
 		return

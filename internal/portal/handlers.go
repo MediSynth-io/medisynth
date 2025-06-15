@@ -174,7 +174,7 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[DASHBOARD] Rendering dashboard for user: %s", userID)
 	log.Printf("[DASHBOARD] Request from host: %s, RemoteAddr: %s", r.Host, r.RemoteAddr)
 
-	// Get API tokens count as a simple metric
+	// Get API tokens count
 	tokens, err := database.GetUserTokens(userID)
 	if err != nil {
 		log.Printf("[DASHBOARD] Error getting tokens for user %s: %v", userID, err)
@@ -182,16 +182,40 @@ func (p *Portal) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DASHBOARD] Found %d tokens for user %s", len(tokens), userID)
+	// Get job statistics
+	jobs, err := database.GetJobsByUserID(userID)
+	if err != nil {
+		log.Printf("[DASHBOARD] Error getting jobs for user %s: %v", userID, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate real metrics
+	totalPatients := 0
+	completedJobs := 0
+	for _, job := range jobs {
+		if job.Status == models.JobStatusCompleted && job.PatientCount != nil {
+			totalPatients += *job.PatientCount
+			completedJobs++
+		}
+	}
+
+	log.Printf("[DASHBOARD] Found %d tokens, %d jobs, %d total patients for user %s", len(tokens), len(jobs), totalPatients, userID)
 
 	data := struct {
 		APIRequests      int    `json:"apiRequests"`
 		RecordsGenerated int    `json:"recordsGenerated"`
 		AccountType      string `json:"accountType"`
+		TotalJobs        int    `json:"totalJobs"`
+		CompletedJobs    int    `json:"completedJobs"`
+		ActiveTokens     int    `json:"activeTokens"`
 	}{
-		APIRequests:      len(tokens) * 10,  // Simple placeholder: 10 requests per token
-		RecordsGenerated: len(tokens) * 100, // Simple placeholder: 100 records per token
-		AccountType:      "Free",            // Default to free tier for now
+		APIRequests:      len(jobs), // Each job represents an API request
+		RecordsGenerated: totalPatients,
+		AccountType:      "Free",
+		TotalJobs:        len(jobs),
+		CompletedJobs:    completedJobs,
+		ActiveTokens:     len(tokens),
 	}
 
 	p.renderTemplate(w, r, "dashboard.html", "Dashboard", data)
