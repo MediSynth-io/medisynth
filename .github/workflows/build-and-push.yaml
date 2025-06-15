@@ -1,4 +1,4 @@
-name: Build and Push
+name: Smart Build and Deploy
 
 on:
   push:
@@ -18,68 +18,103 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      services: ${{ steps.filter.outputs.services || '[]' }}
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            api:
-              - 'internal/api/**'
-              - 'cmd/api/**'
-              - 'Dockerfile.api'
-            portal:
-              - 'internal/portal/**'
-              - 'cmd/portal/**'
-              - 'Dockerfile.portal'
-              - 'templates/**'
-              - 'static/**'
-
-  build-and-push:
-    needs: changes
-    if: needs.changes.outputs.services != '[]'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service: ${{ fromJson(needs.changes.outputs.services) }}
+      api: ${{ steps.filter.outputs.api }}
+      portal: ${{ steps.filter.outputs.portal }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Log in to the Container registry
+      - name: Detect changed files
+        uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          list-files: 'shell'
+          filters: |
+            common: &common
+              - 'internal/database/**'
+              - 'internal/models/**'
+              - 'internal/config/**'
+              - 'internal/auth/**'
+              - 'internal/bitcoin/**'
+              - 'go.mod'
+              - 'go.sum'
+
+            api:
+              - 'cmd/api/**'
+              - 'internal/api/**'
+              - 'internal/s3/**'
+              - 'Dockerfile.api'
+              - *common
+
+            portal:
+              - 'cmd/portal/**'
+              - 'internal/portal/**'
+              - 'templates/**'
+              - 'static/**'
+              - 'Dockerfile.portal'
+              - *common
+
+      - name: Debugging Output
+        run: |
+          echo "Changed files: ${{ steps.filter.outputs.files }}"
+          echo "API changed: ${{ steps.filter.outputs.api }}"
+          echo "Portal changed: ${{ steps.filter.outputs.portal }}"
+
+  build-api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push Docker image for ${{ matrix.service }}
+      - name: Build and push API image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile.${{ matrix.service }}
+          file: ./Dockerfile.api
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-api:latest
+
+  build-portal:
+    needs: changes
+    if: needs.changes.outputs.portal == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Portal image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.portal
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-portal:latest
 
   rollout:
-    needs: [changes, build-and-push]
-    if: needs.changes.outputs.services != '[]'
+    needs: [changes, build-api, build-portal]
+    if: success() && (needs.changes.outputs.api == 'true' || needs.changes.outputs.portal == 'true')
     runs-on: ubuntu-latest
     steps:
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
-
       - name: Set up kubeconfig
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+          echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
-
-      - name: Rollout deployments
-        run: |
-          for service in ${{ join(fromJson(needs.changes.outputs.services), ' ') }}; do
-            kubectl rollout restart deployment/medisynth-${service} -n medisynth-io
-          done 
+      - name: Rollout API deployment
+        if: needs.changes.outputs.api == 'true'
+        run: kubectl rollout restart deployment/medisynth-api -n medisynth-io
+      - name: Rollout Portal deployment
+        if: needs.changes.outputs.portal == 'true'
+        run: kubectl rollout restart deployment/medisynth-portal -n medisynth-io 
