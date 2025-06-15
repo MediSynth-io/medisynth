@@ -3,103 +3,162 @@
 {{define "title"}}Privacy Policy - MediSynth Portal{{end}}
 
 {{define "content"}}
-<div class="py-10">
-    <header class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 class="text-3xl font-bold leading-tight text-gray-900">Privacy Policy</h1>
-        <p class="mt-1 text-sm text-gray-500">Last updated: {{.Data.LastUpdated}}</p>
-    </header>
+<div class="py-12 bg-gradient-to-b from-gray-50 to-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header Section -->
+        <div class="text-center mb-12">
+            <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight">Privacy Policy</h1>
+            <p class="mt-3 text-lg text-gray-500">Last updated: {{.Data.LastUpdated}}</p>
+        </div>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        <div class="bg-white shadow-lg sm:rounded-lg p-8">
-            <div class="prose max-w-none">
-                <h2>1. Introduction</h2>
-                <p>
+        <!-- Content Sections -->
+        <div class="space-y-12">
+            <!-- Introduction -->
+            <section class="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">1. Introduction</h2>
+                <p class="text-gray-600 leading-relaxed">
                     Welcome to MediSynth. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform. 
                     By accessing or using our service, you agree to this privacy policy.
                 </p>
+            </section>
 
-                <h2>2. Information We Collect</h2>
-                <h3>2.1 Personal Information</h3>
-                <ul>
-                    <li>Email address</li>
-                    <li>IP address</li>
-                    <li>Usage data and analytics</li>
-                    <li>Generated patient data</li>
-                    <li>Job history and parameters</li>
-                </ul>
+            <!-- Information Collection -->
+            <section class="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">2. Information We Collect</h2>
+                
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">2.1 Personal Information</h3>
+                        <ul class="list-disc list-inside space-y-2 text-gray-600">
+                            <li>Email address</li>
+                            <li>IP address</li>
+                            <li>Usage data and analytics</li>
+                            <li>Generated patient data</li>
+                            <li>Job history and parameters</li>
+                        </ul>
+                    </div>
 
-                <h3>2.2 Usage Information</h3>
-                <ul>
-                    <li>Login history and session data</li>
-                    <li>API usage patterns</li>
-                    <li>Generated data characteristics</li>
-                    <li>Platform interaction metrics</li>
-                </ul>
-
-                <h2>3. How We Use Your Information</h2>
-                <p>We use the collected information for various purposes:</p>
-                <ul>
-                    <li>To provide and maintain our service</li>
-                    <li>To notify you about changes to our service</li>
-                    <li>To provide customer support</li>
-                    <li>To gather analysis or valuable information to improve our service</li>
-                    <li>To monitor the usage of our service</li>
-                    <li>To detect, prevent and address technical issues</li>
-                </ul>
-
-                <h2>4. Data Retention</h2>
-                <p>We retain your information for the following periods:</p>
-                <ul>
-                    <li>Account information: Until account deletion or 2 years of inactivity</li>
-                    <li>Generated patient data: 30 days from generation</li>
-                    <li>Usage logs: 90 days</li>
-                    <li>API tokens: Until revoked or expired</li>
-                </ul>
-
-                <h2>5. Data Security</h2>
-                <p>
-                    We implement appropriate security measures to protect your personal information. 
-                    However, no method of transmission over the Internet or electronic storage is 100% secure.
-                </p>
-
-                <h2>6. Your Rights</h2>
-                <p>You have the right to:</p>
-                <ul>
-                    <li>Access your personal data</li>
-                    <li>Correct inaccurate data</li>
-                    <li>Request deletion of your data</li>
-                    <li>Object to our use of your data</li>
-                    <li>Request data portability</li>
-                </ul>
-
-                <h2>7. Third-Party Services</h2>
-                <p>
-                    We may employ third-party companies and individuals to facilitate our service, 
-                    provide service-related services, or assist us in analyzing how our service is used.
-                </p>
-
-                <h2>8. Changes to This Privacy Policy</h2>
-                <p>
-                    We may update our Privacy Policy from time to time. We will notify you of any changes 
-                    by posting the new Privacy Policy on this page and updating the "Last updated" date.
-                </p>
-
-                <h2>9. Contact Us</h2>
-                <p>
-                    If you have any questions about this Privacy Policy, please contact us at:
-                    <br>
-                    Email: privacy@medisynth.io
-                </p>
-
-                <div class="mt-8 p-4 bg-gray-50 rounded-lg">
-                    <h3 class="text-lg font-medium text-gray-900">Acceptance of Terms</h3>
-                    <p class="mt-2 text-sm text-gray-600">
-                        By using our platform, you acknowledge that you have read and understood this Privacy Policy 
-                        and agree to the collection and use of information in accordance with this policy.
-                    </p>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">2.2 Usage Information</h3>
+                        <ul class="list-disc list-inside space-y-2 text-gray-600">
+                            <li>Login history and session data</li>
+                            <li>API usage patterns</li>
+                            <li>Generated data characteristics</li>
+                            <li>Platform interaction metrics</li>
+                        </ul>
+                    </div>
                 </div>
-            </div>
+            </section>
+
+            <!-- Information Usage -->
+            <section class="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                <h2 class="text-2xl font-bold text-gray-900 mb-4">3. How We Use Your Information</h2>
+                <p class="text-gray-600 mb-4">We use the collected information for various purposes:</p>
+                <ul class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <li class="flex items-start">
+                        <svg class="h-6 w-6 text-indigo-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span class="text-gray-600">To provide and maintain our service</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg class="h-6 w-6 text-indigo-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span class="text-gray-600">To notify you about changes</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg class="h-6 w-6 text-indigo-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span class="text-gray-600">To provide customer support</span>
+                    </li>
+                    <li class="flex items-start">
+                        <svg class="h-6 w-6 text-indigo-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        <span class="text-gray-600">To gather analysis data</span>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- Data Retention -->
+            <section class="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">4. Data Retention</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-900 mb-2">Account Information</h3>
+                        <p class="text-gray-600">Until account deletion or 2 years of inactivity</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-900 mb-2">Generated Data</h3>
+                        <p class="text-gray-600">30 days from generation</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-900 mb-2">Usage Logs</h3>
+                        <p class="text-gray-600">90 days</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-900 mb-2">API Tokens</h3>
+                        <p class="text-gray-600">Until revoked or expired</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Your Rights -->
+            <section class="bg-white rounded-2xl shadow-sm p-8 border border-gray-100">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">5. Your Rights</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-gray-600">Access your personal data</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                            </svg>
+                        </div>
+                        <span class="text-gray-600">Correct inaccurate data</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                        </div>
+                        <span class="text-gray-600">Request deletion of your data</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <svg class="h-6 w-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                            </svg>
+                        </div>
+                        <span class="text-gray-600">Request data portability</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Contact Section -->
+            <section class="bg-indigo-50 rounded-2xl p-8 border border-indigo-100">
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-indigo-900 mb-4">Questions About Our Privacy Policy?</h2>
+                    <p class="text-indigo-700 mb-6">We're here to help. Contact us at:</p>
+                    <a href="mailto:privacy@medisynth.io" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        privacy@medisynth.io
+                        <svg class="ml-2 -mr-1 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                    </a>
+                </div>
+            </section>
         </div>
-    </main>
+    </div>
 </div>
 {{end}} 
