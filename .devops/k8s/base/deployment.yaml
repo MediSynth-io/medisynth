@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: medisynth-api
+  name: medisynth-io
   namespace: medisynth-io
   labels:
-    app: medisynth-api
+    app: medisynth-io
   annotations:
     timestamp: "2024-03-19-095500"  # This will be updated with each deployment
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: medisynth-api
+      app: medisynth-io
   template:
     metadata:
       labels:
-        app: medisynth-api
+        app: medisynth-io
     spec:
       imagePullSecrets:
       - name: ghcr-login-secret
@@ -57,11 +57,6 @@ spec:
           value: /app/config
         - name: DB_PATH
           value: /data/medisynth.db
-        - name: MEDISYNTH_JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: medisynth-secrets
-              key: jwt-secret
         - name: MEDISYNTH_SESSION_SECRET
           valueFrom:
             secretKeyRef:
@@ -70,6 +65,19 @@ spec:
         securityContext:
           runAsUser: 1000
           runAsGroup: 1000
+      - name: medisynth-portal
+        image: ghcr.io/medisynth-io/medisynth:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8082
+          name: portal-http
+        env:
+        - name: SERVICE_TYPE
+          value: "portal"
+        - name: MEDISYNTH_ENV
+          value: "prod"
+        - name: MEDISYNTH_API_PORT
+          value: "8082"
       initContainers:
       - name: init-db
         image: keinos/sqlite3

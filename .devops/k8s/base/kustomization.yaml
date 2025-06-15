@@ -2,14 +2,20 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - deployment.yaml
-  - service.yaml
-  - ingress.yaml
   - configmap.yaml
+  - deployment.yaml
+  - portal-service.yaml
+  - service.yaml
   - sqlite-pvc.yaml
-  - secrets.yaml
+  - ingress.yaml
+
+secretGenerator:
+- name: medisynth-secrets
+  envs:
+  - .env.secrets
 
 commonLabels:
-  app.kubernetes.io/part-of: medisynth-api
+  app: medisynth-io
+  tier: backend
 
 namespace: medisynth-io 

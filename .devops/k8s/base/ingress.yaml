@@ -33,6 +33,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: medisynth-api-svc
+            name: medisynth-portal-svc
             port:
-              name: http
+              name: portal-http
