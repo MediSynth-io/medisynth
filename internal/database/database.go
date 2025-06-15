@@ -518,22 +518,23 @@ func CreateSession(userID string, token string, expiresAt time.Time) error {
 
 	var query string
 	var err error
-	sessionID := GenerateID()
 
 	if dbType == "postgres" {
-		log.Printf("[DB] Using PostgreSQL syntax")
-		query = `INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)`
+		log.Printf("[DB] Using PostgreSQL syntax with auto-generated UUID")
+		query = `INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3)`
 		log.Printf("[DB] PostgreSQL query: %s", query)
-		_, err = dbConn.Exec(query, sessionID, userID, token, expiresAt)
+		log.Printf("[DB] PostgreSQL values - UserID: %s, Token: %s, ExpiresAt: %v",
+			userID, token[:10]+"...", expiresAt)
+		_, err = dbConn.Exec(query, userID, token, expiresAt)
 	} else {
-		log.Printf("[DB] Using SQLite syntax")
+		log.Printf("[DB] Using SQLite syntax with manual ID generation")
+		sessionID := GenerateID()
 		query = `INSERT INTO sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
 		log.Printf("[DB] SQLite query: %s", query)
+		log.Printf("[DB] SQLite values - ID: %s, UserID: %s, Token: %s, ExpiresAt: %v",
+			sessionID, userID, token[:10]+"...", expiresAt)
 		_, err = dbConn.Exec(query, sessionID, userID, token, expiresAt)
 	}
-
-	log.Printf("[DB] Session values - ID: %s, UserID: %s, Token: %s, ExpiresAt: %v",
-		sessionID, userID, token[:10]+"...", expiresAt)
 
 	if err != nil {
 		log.Printf("[DB] Session creation failed: %v", err)
