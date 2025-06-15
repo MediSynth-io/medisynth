@@ -68,6 +68,19 @@ func (p *Portal) handleRegisterRedirect(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+func (p *Portal) handleAboutRedirect(w http.ResponseWriter, r *http.Request) {
+	// Check if we're on the portal domain - redirect to main site about section
+	if strings.Contains(r.Host, "portal.") {
+		log.Printf("[REDIRECT] Redirecting about from %s to medisynth.io", r.Host)
+		redirectURL := "https://medisynth.io/#about"
+		http.Redirect(w, r, redirectURL, http.StatusPermanentRedirect)
+		return
+	}
+
+	// We're on the main domain, show the about content by redirecting to the landing page with anchor
+	http.Redirect(w, r, "/#about", http.StatusSeeOther)
+}
+
 func (p *Portal) handleDocumentation(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "documentation.html", "Documentation", map[string]interface{}{})
 }

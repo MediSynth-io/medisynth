@@ -73,13 +73,14 @@ func (p *Portal) Routes() http.Handler {
 
 		// Check if this is the main domain (medisynth.io) or subdomain (portal.medisynth.io)
 		if strings.Contains(r.Host, "portal.") {
-			// This is the portal subdomain, serve the home page
+			// This is the portal subdomain, serve the portal home page
 			p.HandleHome(w, r)
 		} else {
 			// This is the main domain, serve the landing page
 			p.handleLanding(w, r)
 		}
 	})
+	r.Get("/about", p.handleAboutRedirect)
 	r.Get("/login", p.handleLoginRedirect)
 	r.Get("/register", p.handleRegisterRedirect)
 	r.Post("/login", p.handleLoginRedirect)
