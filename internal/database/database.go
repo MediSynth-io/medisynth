@@ -371,20 +371,30 @@ func GetUserByID(id string) (*models.User, error) {
 // CreateToken creates a new API token
 func CreateToken(userID string, name, token string, expiresAt *time.Time) (*models.Token, error) {
 	t := &models.Token{
-		ID:        generateID(),
 		UserID:    userID,
 		Token:     token,
 		Name:      name,
-		CreatedAt: time.Now(),
 		ExpiresAt: expiresAt,
 	}
 
-	_, err := dbConn.Exec(
-		"INSERT INTO tokens (id, user_id, token, name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-		t.ID, t.UserID, t.Token, t.Name, t.CreatedAt, t.ExpiresAt,
-	)
-	if err != nil {
-		return nil, err
+	if dbType == "postgres" {
+		err := dbConn.QueryRow(
+			"INSERT INTO tokens (user_id, token, name, expires_at) VALUES ($1, $2, $3, $4) RETURNING id, created_at",
+			t.UserID, t.Token, t.Name, t.ExpiresAt,
+		).Scan(&t.ID, &t.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		t.ID = generateID()
+		t.CreatedAt = time.Now()
+		_, err := dbConn.Exec(
+			"INSERT INTO tokens (id, user_id, token, name, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+			t.ID, t.UserID, t.Token, t.Name, t.CreatedAt, t.ExpiresAt,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return t, nil
@@ -393,10 +403,13 @@ func CreateToken(userID string, name, token string, expiresAt *time.Time) (*mode
 // GetTokenByValue retrieves a token by its value
 func GetTokenByValue(token string) (*models.Token, error) {
 	t := &models.Token{}
-	err := dbConn.QueryRow(
-		"SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE token = ?",
-		token,
-	).Scan(&t.ID, &t.UserID, &t.Token, &t.Name, &t.CreatedAt, &t.ExpiresAt)
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE token = $1"
+	} else {
+		query = "SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE token = ?"
+	}
+	err := dbConn.QueryRow(query, token).Scan(&t.ID, &t.UserID, &t.Token, &t.Name, &t.CreatedAt, &t.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -405,11 +418,16 @@ func GetTokenByValue(token string) (*models.Token, error) {
 
 // DeleteToken deletes a token
 func DeleteToken(userID string, tokenID string) error {
-	result, err := dbConn.Exec("DELETE FROM tokens WHERE id = ? AND user_id = ?", tokenID, userID)
+	var query string
+	if dbType == "postgres" {
+		query = "DELETE FROM tokens WHERE id = $1 AND user_id = $2"
+	} else {
+		query = "DELETE FROM tokens WHERE id = ? AND user_id = ?"
+	}
+	result, err := dbConn.Exec(query, tokenID, userID)
 	if err != nil {
 		return err
 	}
-
 	rows, err := result.RowsAffected()
 	if err != nil {
 		return err
@@ -417,16 +435,18 @@ func DeleteToken(userID string, tokenID string) error {
 	if rows == 0 {
 		return sql.ErrNoRows
 	}
-
 	return nil
 }
 
 // GetUserTokens retrieves all tokens for a user
 func GetUserTokens(userID string) ([]*models.Token, error) {
-	rows, err := dbConn.Query(
-		"SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE user_id = ?",
-		userID,
-	)
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE user_id = $1"
+	} else {
+		query = "SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE user_id = ?"
+	}
+	rows, err := dbConn.Query(query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -441,30 +461,38 @@ func GetUserTokens(userID string) ([]*models.Token, error) {
 		}
 		tokens = append(tokens, t)
 	}
-
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-
 	return tokens, nil
 }
 
 // CreateSession creates a new session for a user
 func CreateSession(userID string, token string, expiresAt time.Time) (*models.Session, error) {
 	session := &models.Session{
-		ID:        generateID(),
 		UserID:    userID,
 		Token:     token,
-		CreatedAt: time.Now(),
 		ExpiresAt: expiresAt,
 	}
 
-	_, err := dbConn.Exec(
-		"INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-		session.ID, session.UserID, session.Token, session.CreatedAt, session.ExpiresAt,
-	)
-	if err != nil {
-		return nil, err
+	if dbType == "postgres" {
+		err := dbConn.QueryRow(
+			"INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, $3) RETURNING id, created_at",
+			session.UserID, session.Token, session.ExpiresAt,
+		).Scan(&session.ID, &session.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		session.ID = generateID()
+		session.CreatedAt = time.Now()
+		_, err := dbConn.Exec(
+			"INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+			session.ID, session.UserID, session.Token, session.CreatedAt, session.ExpiresAt,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return session, nil
@@ -473,10 +501,13 @@ func CreateSession(userID string, token string, expiresAt time.Time) (*models.Se
 // GetSessionByToken retrieves a session by its token
 func GetSessionByToken(token string) (*models.Session, error) {
 	session := &models.Session{}
-	err := dbConn.QueryRow(
-		"SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = ?",
-		token,
-	).Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.ExpiresAt)
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = $1"
+	} else {
+		query = "SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = ?"
+	}
+	err := dbConn.QueryRow(query, token).Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -485,13 +516,25 @@ func GetSessionByToken(token string) (*models.Session, error) {
 
 // DeleteSession deletes a session
 func DeleteSession(token string) error {
-	_, err := dbConn.Exec("DELETE FROM sessions WHERE token = ?", token)
+	var query string
+	if dbType == "postgres" {
+		query = "DELETE FROM sessions WHERE token = $1"
+	} else {
+		query = "DELETE FROM sessions WHERE token = ?"
+	}
+	_, err := dbConn.Exec(query, token)
 	return err
 }
 
 // CleanupExpiredSessions deletes all expired sessions
 func CleanupExpiredSessions() error {
-	_, err := dbConn.Exec("DELETE FROM sessions WHERE expires_at < ?", time.Now())
+	var query string
+	if dbType == "postgres" {
+		query = "DELETE FROM sessions WHERE expires_at < $1"
+	} else {
+		query = "DELETE FROM sessions WHERE expires_at < ?"
+	}
+	_, err := dbConn.Exec(query, time.Now())
 	return err
 }
 
