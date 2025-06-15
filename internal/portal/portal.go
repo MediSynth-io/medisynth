@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
@@ -68,14 +69,22 @@ func (p *Portal) Routes() http.Handler {
 
 	// Public routes
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Handling home page request")
-		p.HandleHome(w, r)
+		log.Printf("Handling root request for host: %s", r.Host)
+
+		// Check if this is the main domain (medisynth.io) or subdomain (portal.medisynth.io)
+		if strings.Contains(r.Host, "portal.") {
+			// This is the portal subdomain, serve the portal home page
+			p.HandleHome(w, r)
+		} else {
+			// This is the main domain, serve the landing page
+			p.handleLanding(w, r)
+		}
 	})
-	r.Get("/login", p.handleLogin)
-	r.Get("/register", p.handleRegister)
-	r.Get("/documentation", p.handleDocumentation)
-	r.Post("/login", p.handleLoginPost)
-	r.Post("/register", p.handleRegisterPost)
+	r.Get("/about", p.handleAboutRedirect)
+	r.Get("/login", p.handleLoginRedirect)
+	r.Get("/register", p.handleRegisterRedirect)
+	r.Post("/login", p.handleLoginRedirect)
+	r.Post("/register", p.handleRegisterRedirect)
 
 	// Favicon
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
@@ -85,11 +94,23 @@ func (p *Portal) Routes() http.Handler {
 	// Logout route
 	r.Get("/logout", p.handleLogout)
 
+	// Debug route to verify service is running
+	r.Get("/debug", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"service":"medisynth-portal","status":"running","timestamp":"` + time.Now().Format(time.RFC3339) + `"}`))
+	})
+
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(p.requireAuth)
 
 		r.Get("/dashboard", p.handleDashboard)
+		r.Get("/documentation", p.handleDocumentation)
+		r.Handle("/swagger/*", http.HandlerFunc(p.handleSwaggerProxy))
+		r.Get("/jobs", p.handleJobs)
+		r.Get("/jobs/new", p.handleNewJob)
+		r.Post("/jobs/new", p.handleCreateJob)
 
 		// Token management routes
 		r.Route("/tokens", func(r chi.Router) {
@@ -120,31 +141,38 @@ func (p *Portal) Routes() http.Handler {
 
 func (p *Portal) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[AUTH] Checking authentication for %s %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+
 		cookie, err := r.Cookie("session")
 		if err != nil || cookie.Value == "" {
+			log.Printf("[AUTH] No session cookie found: %v", err)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		session, err := auth.ValidateSession(cookie.Value)
+
+		log.Printf("[AUTH] Found session cookie, length: %d", len(cookie.Value))
+
+		userID, err := auth.ValidateSession(cookie.Value)
 		if err != nil {
-			if err == auth.ErrSessionExpired {
-				// Clear expired session cookie
-				http.SetCookie(w, &http.Cookie{
-					Name:     "session",
-					Value:    "",
-					Path:     "/",
-					Domain:   p.config.DomainPortal,
-					HttpOnly: true,
-					Secure:   p.config.DomainSecure,
-					Expires:  time.Unix(0, 0),
-					SameSite: http.SameSiteStrictMode,
-				})
-			}
+			log.Printf("[AUTH] Session validation failed: %v", err)
+			// Clear invalid session cookie
+			http.SetCookie(w, &http.Cookie{
+				Name:     "session",
+				Value:    "",
+				Path:     "/",
+				Domain:   p.config.DomainPortal,
+				HttpOnly: true,
+				Secure:   p.config.DomainSecure,
+				Expires:  time.Unix(0, 0),
+				SameSite: http.SameSiteStrictMode,
+			})
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
+
+		log.Printf("[AUTH] Session validation successful for user: %s", userID)
 		ctx := r.Context()
-		ctx = context.WithValue(ctx, "userID", session.UserID)
+		ctx = context.WithValue(ctx, "userID", userID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

@@ -1,0 +1,73 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: medisynth-postgres
+  namespace: medisynth-io
+spec:
+  instances: 1
+  
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+      effective_cache_size: "512MB"
+      maintenance_work_mem: "64MB"
+      checkpoint_completion_target: "0.9"
+      wal_buffers: "16MB"
+      default_statistics_target: "100"
+      random_page_cost: "1.1"
+      effective_io_concurrency: "200"
+      work_mem: "4MB"
+      min_wal_size: "1GB"
+      max_wal_size: "4GB"
+
+  bootstrap:
+    initdb:
+      database: medisynth
+      owner: medisynth
+      secret:
+        name: medisynth-postgres-credentials
+
+  storage:
+    size: 10Gi
+    storageClass: do-block-storage
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  monitoring:
+    enabled: false
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: medisynth-postgres-credentials
+  namespace: medisynth-io
+type: kubernetes.io/basic-auth
+data:
+  # username: medisynth (base64 encoded)
+  username: bWVkaXN5bnRo
+  # password: secure_random_password_here (base64 encoded - you should change this!)
+  password: c2VjdXJlX3JhbmRvbV9wYXNzd29yZF9oZXJl
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: medisynth-postgres-rw
+  namespace: medisynth-io
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+  selector:
+    cnpg.io/cluster: medisynth-postgres
+    role: primary 

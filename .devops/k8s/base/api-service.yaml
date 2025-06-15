@@ -14,3 +14,4 @@ spec:
       targetPort: http
   selector:
     app: medisynth-api
+    component: api

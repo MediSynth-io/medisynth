@@ -1,4 +1,4 @@
-{{template "base.html" .}}
+{{template "base" .}}
 
 {{define "title"}}404 Not Found - MediSynth Portal{{end}}
 
@@ -7,7 +7,11 @@
     <div class="max-w-md w-full text-center">
         <h1 class="text-9xl font-bold text-gray-900">404</h1>
         <p class="mt-4 text-xl text-gray-600">Page not found</p>
-        <a href="/" class="mt-6 inline-block text-blue-600 hover:text-blue-500">Return to Home</a>
+        {{if .User}}
+            <a href="/" class="mt-6 inline-block text-blue-600 hover:text-blue-500">Return to Portal</a>
+        {{else}}
+            <a href="https://medisynth.io/" class="mt-6 inline-block text-blue-600 hover:text-blue-500">Return to Home</a>
+        {{end}}
     </div>
 </div>
 {{end}} 

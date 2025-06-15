@@ -6,6 +6,7 @@ metadata:
 spec:
   selector:
     app: medisynth-portal
+    component: portal
   ports:
     - name: http
       protocol: TCP

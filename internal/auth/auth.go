@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"log"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/models"
@@ -103,4 +105,102 @@ func generateRandomToken() (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(tokenBytes), nil
+}
+
+// CreateSession creates a new session for a user
+func CreateSession(userID string) (string, error) {
+	log.Printf("[AUTH] Starting session creation for user: %s", userID)
+
+	token, err := generateRandomToken()
+	if err != nil {
+		log.Printf("[AUTH] Failed to generate random token for user %s: %v", userID, err)
+		return "", err
+	}
+	log.Printf("[AUTH] Generated token for user %s, token length: %d", userID, len(token))
+
+	expiresAt := time.Now().Add(24 * time.Hour)
+	log.Printf("[AUTH] Session will expire at: %v", expiresAt)
+
+	log.Printf("[AUTH] Calling dataStore.CreateSession for user %s", userID)
+	err = dataStore.CreateSession(userID, token, expiresAt)
+	if err != nil {
+		log.Printf("[AUTH] dataStore.CreateSession failed for user %s: %v", userID, err)
+		return "", err
+	}
+
+	log.Printf("[AUTH] Session created successfully for user %s", userID)
+	return token, nil
+}
+
+// ValidateSession validates a session token and returns the user ID
+func ValidateSession(token string) (string, error) {
+	session, err := dataStore.ValidateSession(token)
+	if err != nil {
+		return "", err
+	}
+	return session.UserID, nil
+}
+
+// DeleteSession deletes a user's session
+func DeleteSession(token string) error {
+	return dataStore.DeleteSession(token)
+}
+
+// CleanupExpiredSessions removes expired session records from the database.
+func CleanupExpiredSessions() error {
+	return dataStore.CleanupExpiredSessions()
+}
+
+// --- Validation Helpers ---
+
+// PasswordRequirements defines the complexity requirements for a password
+type PasswordRequirements struct {
+	MinLength int
+	HasUpper  bool
+	HasLower  bool
+	HasNumber bool
+	HasSymbol bool
+}
+
+// GetPasswordRequirements returns the current password policy
+func GetPasswordRequirements() PasswordRequirements {
+	return PasswordRequirements{
+		MinLength: 8,
+		HasUpper:  true,
+		HasLower:  true,
+		HasNumber: true,
+		HasSymbol: true,
+	}
+}
+
+// ValidatePassword checks if a password meets the complexity requirements.
+func ValidatePassword(password string) bool {
+	var (
+		hasUpper  bool
+		hasLower  bool
+		hasNumber bool
+		hasSymbol bool
+	)
+	if len(password) < GetPasswordRequirements().MinLength {
+		return false
+	}
+	for _, char := range password {
+		switch {
+		case 'A' <= char && char <= 'Z':
+			hasUpper = true
+		case 'a' <= char && char <= 'z':
+			hasLower = true
+		case '0' <= char && char <= '9':
+			hasNumber = true
+		default:
+			hasSymbol = true
+		}
+	}
+	return hasUpper && hasLower && hasNumber && hasSymbol
+}
+
+// ValidateEmail checks if an email has a valid format.
+func ValidateEmail(email string) bool {
+	// A very basic email validation check
+	return strings.Contains(email, "@") && strings.Contains(email, ".")
 }
