@@ -106,11 +106,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Kubeconfig
-        uses: azure/k8s-set-context@v3
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBE_CONFIG }}
-          cluster-type: generic
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
 
       - name: Rollout API deployment
         if: needs.changes.outputs.api == 'true'
