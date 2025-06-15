@@ -26,7 +26,7 @@ func initializeAPI(configPath string) (*api.Api, error) {
 	}
 
 	// Initialize store
-	dataStore := store.New(database.GetConnection())
+	dataStore := store.New()
 
 	// Initialize auth with store
 	auth.SetStore(dataStore)
