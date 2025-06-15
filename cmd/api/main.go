@@ -5,17 +5,33 @@ import (
 	"log"
 
 	"github.com/MediSynth-io/medisynth/internal/api"
+	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/store"
 )
 
 const version = "0.0.1"
 
 func initializeAPI(configPath string) (*api.Api, error) {
+	// Load configuration
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
 
+	// Initialize database
+	if err := database.Init(cfg); err != nil {
+		return nil, err
+	}
+
+	// Initialize store
+	dataStore := store.New(database.GetConnection())
+
+	// Initialize auth with store
+	auth.SetStore(dataStore)
+
+	// Initialize API
 	api, err := api.NewApi(*cfg)
 	if err != nil {
 		return nil, err
