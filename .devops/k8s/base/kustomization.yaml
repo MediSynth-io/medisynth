@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - configmap.yaml
+  - portal-configmap.yaml
   - api-deployment.yaml
   - portal-deployment.yaml
   - portal-service.yaml
