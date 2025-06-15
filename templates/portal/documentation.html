@@ -8,16 +8,27 @@
         <div class="px-4 py-6 sm:px-0">
             <!-- Header -->
             <div class="text-center mb-12">
+                <div class="mb-4">
+                    <div class="inline-flex items-center bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium mb-4">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Authenticated Access
+                    </div>
+                </div>
                 <h1 class="text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 text-transparent bg-clip-text mb-4">
                     API Documentation
                 </h1>
                 <p class="text-xl text-gray-600 max-w-3xl mx-auto">
                     Complete guide to generating synthetic medical data with the MediSynth API
                 </p>
-                <div class="mt-6 flex justify-center">
+                <div class="mt-6 flex flex-col sm:flex-row gap-4 justify-center items-center">
                     <div class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-2 rounded-full text-sm font-semibold">
                         Base URL: https://api.medisynth.io/v1
                     </div>
+                    <a href="/tokens" class="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-6 py-2 rounded-full text-sm font-semibold hover:from-emerald-600 hover:to-teal-600 transition-all duration-200">
+                        Manage API Tokens
+                    </a>
                 </div>
             </div>
 
