@@ -499,15 +499,27 @@ func GetUserTokens(userID string) ([]*models.Token, error) {
 
 // CreateSession creates a new session for a user
 func CreateSession(userID string, token string, expiresAt time.Time) error {
-	query := `INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)`
-	_, err := dbConn.Exec(query, GenerateID(), userID, token, expiresAt)
-	return err
+	var query string
+	if dbType == "postgres" {
+		query = `INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)`
+		_, err := dbConn.Exec(query, GenerateID(), userID, token, expiresAt)
+		return err
+	} else {
+		query = `INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)`
+		_, err := dbConn.Exec(query, GenerateID(), userID, token, time.Now(), expiresAt)
+		return err
+	}
 }
 
 // ValidateSession retrieves a user by session token
 func ValidateSession(token string) (*models.Session, error) {
 	var session models.Session
-	query := `SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = $1`
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = $1`
+	} else {
+		query = `SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = ?`
+	}
 	err := dbConn.QueryRow(query, token).Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.ExpiresAt)
 	if err != nil {
 		return nil, err
@@ -523,14 +535,24 @@ func ValidateSession(token string) (*models.Session, error) {
 
 // DeleteSession deletes a session by its token
 func DeleteSession(token string) error {
-	query := `DELETE FROM sessions WHERE token = $1`
+	var query string
+	if dbType == "postgres" {
+		query = `DELETE FROM sessions WHERE token = $1`
+	} else {
+		query = `DELETE FROM sessions WHERE token = ?`
+	}
 	_, err := dbConn.Exec(query, token)
 	return err
 }
 
 // CleanupExpiredSessions removes all sessions that have passed their expiration time.
 func CleanupExpiredSessions() error {
-	query := `DELETE FROM sessions WHERE expires_at < $1`
+	var query string
+	if dbType == "postgres" {
+		query = `DELETE FROM sessions WHERE expires_at < $1`
+	} else {
+		query = `DELETE FROM sessions WHERE expires_at < ?`
+	}
 	_, err := dbConn.Exec(query, time.Now())
 	return err
 }
