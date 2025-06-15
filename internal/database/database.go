@@ -71,6 +71,19 @@ func Init(cfg *config.Config) error {
 	dbConn = db
 	dbType = cfg.DatabaseType
 	log.Printf("=== DATABASE INITIALIZED SUCCESSFULLY ===")
+	log.Printf("Database type set to: %s", dbType)
+	log.Printf("Database connection established: %v", dbConn != nil)
+
+	// Test basic database functionality
+	var testCount int
+	testQuery := "SELECT COUNT(*) FROM sessions"
+	err = dbConn.QueryRow(testQuery).Scan(&testCount)
+	if err != nil {
+		log.Printf("WARNING: Could not query sessions table: %v", err)
+	} else {
+		log.Printf("Sessions table accessible, current count: %d", testCount)
+	}
+
 	return nil
 }
 
@@ -231,7 +244,7 @@ func initSchema(db *sql.DB, dbType string) error {
 				id TEXT PRIMARY KEY,
 				user_id TEXT NOT NULL,
 				token TEXT UNIQUE NOT NULL,
-				created_at DATETIME NOT NULL,
+				created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				expires_at DATETIME NOT NULL,
 				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 			)`,
@@ -499,16 +512,36 @@ func GetUserTokens(userID string) ([]*models.Token, error) {
 
 // CreateSession creates a new session for a user
 func CreateSession(userID string, token string, expiresAt time.Time) error {
+	log.Printf("[DB] Starting session creation - UserID: %s, TokenLength: %d, ExpiresAt: %v", userID, len(token), expiresAt)
+	log.Printf("[DB] Database type: %s", dbType)
+	log.Printf("[DB] Database connection status: %v", dbConn != nil)
+
 	var query string
+	var err error
+	sessionID := GenerateID()
+
 	if dbType == "postgres" {
+		log.Printf("[DB] Using PostgreSQL syntax")
 		query = `INSERT INTO sessions (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)`
-		_, err := dbConn.Exec(query, GenerateID(), userID, token, expiresAt)
-		return err
+		log.Printf("[DB] PostgreSQL query: %s", query)
+		_, err = dbConn.Exec(query, sessionID, userID, token, expiresAt)
 	} else {
-		query = `INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)`
-		_, err := dbConn.Exec(query, GenerateID(), userID, token, time.Now(), expiresAt)
-		return err
+		log.Printf("[DB] Using SQLite syntax")
+		query = `INSERT INTO sessions (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`
+		log.Printf("[DB] SQLite query: %s", query)
+		_, err = dbConn.Exec(query, sessionID, userID, token, expiresAt)
 	}
+
+	log.Printf("[DB] Session values - ID: %s, UserID: %s, Token: %s, ExpiresAt: %v",
+		sessionID, userID, token[:10]+"...", expiresAt)
+
+	if err != nil {
+		log.Printf("[DB] Session creation failed: %v", err)
+	} else {
+		log.Printf("[DB] Session created successfully")
+	}
+
+	return err
 }
 
 // ValidateSession retrieves a user by session token

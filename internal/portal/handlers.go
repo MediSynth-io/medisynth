@@ -76,17 +76,25 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
+	log.Printf("[PORTAL] Login attempt for email: %s", email)
+
 	user, err := auth.ValidateUser(email, password)
 	if err != nil {
+		log.Printf("[PORTAL] User validation failed for %s: %v", email, err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Invalid email or password", "Email": email})
 		return
 	}
 
+	log.Printf("[PORTAL] User validation successful for %s (UserID: %s)", email, user.ID)
+
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
+		log.Printf("ERROR: Session creation failed for user %s: %v", user.ID, err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Failed to create session.", "Email": email})
 		return
 	}
+
+	log.Printf("[PORTAL] Session created successfully for user %s, token length: %d", user.ID, len(token))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -98,6 +106,8 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
+
+	log.Printf("[PORTAL] Session cookie set for user %s, redirecting to dashboard", user.ID)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -106,31 +116,38 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
+	log.Printf("[PORTAL] Registration attempt for email: %s", email)
+
 	data := map[string]interface{}{
 		"Email":                email,
 		"PasswordRequirements": auth.GetPasswordRequirements(),
 	}
 
 	if !auth.ValidateEmail(email) {
+		log.Printf("[PORTAL] Invalid email format: %s", email)
 		data["Error"] = "Please enter a valid email address"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	if password != confirmPassword {
+		log.Printf("[PORTAL] Password mismatch for email: %s", email)
 		data["Error"] = "Passwords do not match"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	if !auth.ValidatePassword(password) {
+		log.Printf("[PORTAL] Password validation failed for email: %s", email)
 		data["Error"] = "Password does not meet the requirements"
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
+	log.Printf("[PORTAL] Attempting to register user: %s", email)
 	user, err := auth.RegisterUser(email, password)
 	if err != nil {
+		log.Printf("[PORTAL] User registration failed for %s: %v", email, err)
 		if strings.Contains(err.Error(), "UNIQUE constraint") || strings.Contains(err.Error(), "duplicate key") {
 			data["Error"] = "This email is already registered."
 		} else {
@@ -141,6 +158,8 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("[PORTAL] User registered successfully: %s (UserID: %s)", email, user.ID)
+
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
 		log.Printf("ERROR: User %s registered but session creation failed: %v", email, err)
@@ -149,6 +168,8 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?info=registration_success", http.StatusSeeOther)
 		return
 	}
+
+	log.Printf("[PORTAL] Session created successfully for new user %s, token length: %d", user.ID, len(token))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -160,6 +181,8 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
+
+	log.Printf("[PORTAL] Registration complete for %s, redirecting to dashboard", email)
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 

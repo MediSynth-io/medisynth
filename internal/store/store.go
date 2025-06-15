@@ -1,6 +1,7 @@
 package store
 
 import (
+	"log"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/database"
@@ -47,7 +48,14 @@ func (s *Store) GetUserTokens(userID string) ([]*models.Token, error) {
 
 // CreateSession creates a new session
 func (s *Store) CreateSession(userID string, token string, expiresAt time.Time) error {
-	return database.CreateSession(userID, token, expiresAt)
+	log.Printf("[STORE] CreateSession called - UserID: %s, TokenLength: %d", userID, len(token))
+	err := database.CreateSession(userID, token, expiresAt)
+	if err != nil {
+		log.Printf("[STORE] CreateSession failed: %v", err)
+	} else {
+		log.Printf("[STORE] CreateSession succeeded")
+	}
+	return err
 }
 
 // ValidateSession validates a session token

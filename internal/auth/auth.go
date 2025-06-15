@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"log"
 	"strings"
 	"time"
 
@@ -108,15 +109,26 @@ func generateRandomToken() (string, error) {
 
 // CreateSession creates a new session for a user
 func CreateSession(userID string) (string, error) {
+	log.Printf("[AUTH] Starting session creation for user: %s", userID)
+
 	token, err := generateRandomToken()
 	if err != nil {
+		log.Printf("[AUTH] Failed to generate random token for user %s: %v", userID, err)
 		return "", err
 	}
+	log.Printf("[AUTH] Generated token for user %s, token length: %d", userID, len(token))
+
 	expiresAt := time.Now().Add(24 * time.Hour)
+	log.Printf("[AUTH] Session will expire at: %v", expiresAt)
+
+	log.Printf("[AUTH] Calling dataStore.CreateSession for user %s", userID)
 	err = dataStore.CreateSession(userID, token, expiresAt)
 	if err != nil {
+		log.Printf("[AUTH] dataStore.CreateSession failed for user %s: %v", userID, err)
 		return "", err
 	}
+
+	log.Printf("[AUTH] Session created successfully for user %s", userID)
 	return token, nil
 }
 

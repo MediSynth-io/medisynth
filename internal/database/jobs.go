@@ -23,13 +23,16 @@ func CreateJob(job *models.Job) error {
 // UpdateJobStatus updates the status and result of a job
 func UpdateJobStatus(jobID string, status models.JobStatus, errorMessage *string, outputPath *string, outputSize *int64, patientCount *int) error {
 	var query string
+	var err error
+
 	if dbType == "postgres" {
 		query = "UPDATE jobs SET status = $1, error_message = $2, output_path = $3, output_size = $4, patient_count = $5, completed_at = NOW() WHERE id = $6"
+		_, err = dbConn.Exec(query, status, errorMessage, outputPath, outputSize, patientCount, jobID)
 	} else {
 		query = "UPDATE jobs SET status = ?, error_message = ?, output_path = ?, output_size = ?, patient_count = ?, completed_at = ? WHERE id = ?"
+		_, err = dbConn.Exec(query, status, errorMessage, outputPath, outputSize, patientCount, time.Now(), jobID)
 	}
 
-	_, err := dbConn.Exec(query, status, errorMessage, outputPath, outputSize, patientCount, time.Now(), jobID)
 	return err
 }
 
