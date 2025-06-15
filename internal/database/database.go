@@ -11,6 +11,34 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// User represents a user in the system
+type User struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	Password  string    `json:"-"` // Password is never exposed in JSON
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Token represents an API token
+type Token struct {
+	ID        string     `json:"id"`
+	UserID    string     `json:"user_id"`
+	Token     string     `json:"token"`
+	Name      string     `json:"name"`
+	CreatedAt time.Time  `json:"created_at"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+// Session represents a user session
+type Session struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Token     string    `json:"token"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
 var dbConn *sql.DB
 
 // Init initializes the database connection and schema
@@ -52,7 +80,7 @@ func GetConnection() *sql.DB {
 func initSchema(db *sql.DB) error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id TEXT PRIMARY KEY,
 			email TEXT UNIQUE NOT NULL,
 			password TEXT NOT NULL,
 			created_at DATETIME NOT NULL,
@@ -60,7 +88,7 @@ func initSchema(db *sql.DB) error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS tokens (
 			id TEXT PRIMARY KEY,
-			user_id INTEGER NOT NULL,
+			user_id TEXT NOT NULL,
 			token TEXT UNIQUE NOT NULL,
 			name TEXT NOT NULL,
 			created_at DATETIME NOT NULL,
@@ -69,7 +97,7 @@ func initSchema(db *sql.DB) error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS sessions (
 			id TEXT PRIMARY KEY,
-			user_id INTEGER NOT NULL,
+			user_id TEXT NOT NULL,
 			token TEXT UNIQUE NOT NULL,
 			created_at DATETIME NOT NULL,
 			expires_at DATETIME NOT NULL,
@@ -99,25 +127,20 @@ func createDataDir(dir string) error {
 func CreateUser(email, password string) (*User, error) {
 	now := time.Now()
 	user := &User{
+		ID:        generateID(),
 		Email:     email,
 		Password:  password,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
-	result, err := dbConn.Exec(
-		"INSERT INTO users (email, password, created_at, updated_at) VALUES (?, ?, ?, ?)",
-		user.Email, user.Password, user.CreatedAt, user.UpdatedAt,
+	_, err := dbConn.Exec(
+		"INSERT INTO users (id, email, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+		user.ID, user.Email, user.Password, user.CreatedAt, user.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-	user.ID = id
 
 	return user, nil
 }
@@ -136,7 +159,7 @@ func GetUserByEmail(email string) (*User, error) {
 }
 
 // CreateToken creates a new API token
-func CreateToken(userID int64, name, token string, expiresAt *time.Time) (*Token, error) {
+func CreateToken(userID string, name, token string, expiresAt *time.Time) (*Token, error) {
 	t := &Token{
 		ID:        generateID(),
 		UserID:    userID,
@@ -171,7 +194,7 @@ func GetTokenByValue(token string) (*Token, error) {
 }
 
 // DeleteToken deletes a token
-func DeleteToken(userID int64, tokenID string) error {
+func DeleteToken(userID string, tokenID string) error {
 	result, err := dbConn.Exec("DELETE FROM tokens WHERE id = ? AND user_id = ?", tokenID, userID)
 	if err != nil {
 		return err
@@ -189,7 +212,7 @@ func DeleteToken(userID int64, tokenID string) error {
 }
 
 // GetUserTokens retrieves all tokens for a user
-func GetUserTokens(userID int64) ([]*Token, error) {
+func GetUserTokens(userID string) ([]*Token, error) {
 	rows, err := dbConn.Query(
 		"SELECT id, user_id, token, name, created_at, expires_at FROM tokens WHERE user_id = ?",
 		userID,
@@ -208,7 +231,12 @@ func GetUserTokens(userID int64) ([]*Token, error) {
 		}
 		tokens = append(tokens, t)
 	}
-	return tokens, rows.Err()
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return tokens, nil
 }
 
 // generateID generates a unique ID
