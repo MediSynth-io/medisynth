@@ -26,10 +26,10 @@
                 <dt class="text-sm font-medium text-gray-500">Amount (USD)</dt>
                 <dd class="mt-1 text-lg font-semibold text-gray-900">${{printf "%.2f" .Order.AmountUSD}}</dd>
             </div>
-            {{if .Order.AmountBTC}}
+            {{if .Order.HasAmountBTC}}
             <div>
                 <dt class="text-sm font-medium text-gray-500">Amount (BTC)</dt>
-                <dd class="mt-1 text-lg font-semibold text-gray-900">{{printf "%.8f" .Order.AmountBTC}}</dd>
+                <dd class="mt-1 text-lg font-semibold text-gray-900">{{printf "%.8f" .Order.GetAmountBTC}}</dd>
             </div>
             {{end}}
             <div>
@@ -58,47 +58,49 @@
                     </button>
                 </div>
                 
-                {{if .Order.AmountBTC}}
+                {{if .Order.HasAmountBTC}}
                 <div>
                     <label class="block text-sm font-medium text-blue-800 mb-2">Amount to Send</label>
                     <div class="bg-white border border-blue-200 rounded p-3 font-mono text-lg font-semibold">
-                        {{printf "%.8f" .Order.AmountBTC}} BTC
+                        {{printf "%.8f" .Order.GetAmountBTC}} BTC
                     </div>
-                    <button data-copy="{{printf "%.8f" .Order.AmountBTC}}" 
+                    <button data-copy="{{printf "%.8f" .Order.GetAmountBTC}}" 
                             class="copy-btn mt-2 text-sm text-blue-600 hover:text-blue-800">
                         📋 Copy Amount
                     </button>
                 </div>
                 {{end}}
                 
-                {{if .Order.ExpiresAt}}
+                {{if .Order.HasExpiration}}
                 <div>
                     <label class="block text-sm font-medium text-blue-800 mb-2">Expires</label>
                     <div class="text-sm text-blue-700">
-                        {{.Order.ExpiresAt.Format "January 2, 2006 at 3:04 PM"}}
+                        {{.Order.GetExpiresAt.Format "January 2, 2006 at 3:04 PM"}}
                     </div>
                 </div>
                 {{end}}
             </div>
             
             <!-- QR Code -->
-            {{if .Order.QRCodeData}}
+            {{if .Order.HasQRCode}}
             <div class="text-center">
                 <label class="block text-sm font-medium text-blue-800 mb-2">QR Code</label>
                 <div class="bg-white p-4 rounded-lg border border-blue-200 inline-block">
-                    <img src="data:image/png;base64,{{.Order.QRCodeData}}" alt="Payment QR Code" class="w-48 h-48">
+                    <img src="data:image/png;base64,{{.Order.GetQRCodeData}}" alt="Payment QR Code" class="w-48 h-48">
                 </div>
                 <p class="mt-2 text-xs text-blue-600">Scan with your Bitcoin wallet</p>
             </div>
             {{end}}
         </div>
         
+        {{if .Order.HasAmountBTC}}
         <div class="mt-4 p-4 bg-blue-100 rounded-lg">
             <p class="text-sm text-blue-800">
-                <strong>Instructions:</strong> Send exactly {{printf "%.8f" .Order.AmountBTC}} BTC to the address above. 
+                <strong>Instructions:</strong> Send exactly {{printf "%.8f" .Order.GetAmountBTC}} BTC to the address above. 
                 Payment will be confirmed automatically once detected on the blockchain.
             </p>
         </div>
+        {{end}}
     </div>
     {{end}}
 
@@ -108,17 +110,17 @@
         <h2 class="text-lg font-semibold text-gray-900 mb-4">Payment Status</h2>
         
         <div class="space-y-3">
-            {{if .Order.PaymentReceivedAt}}
+            {{if .Order.HasPaymentReceived}}
             <div class="flex justify-between">
                 <span class="text-sm font-medium text-gray-500">Payment Received</span>
-                <span class="text-sm text-gray-900">{{.Order.PaymentReceivedAt.Format "Jan 2, 2006 3:04 PM"}}</span>
+                <span class="text-sm text-gray-900">{{.Order.GetPaymentReceivedAt.Format "Jan 2, 2006 3:04 PM"}}</span>
             </div>
             {{end}}
             
-            {{if .Order.TransactionHash}}
+            {{if .Order.HasTransactionHash}}
             <div class="flex justify-between">
                 <span class="text-sm font-medium text-gray-500">Transaction Hash</span>
-                <span class="text-sm text-gray-900 font-mono break-all">{{.Order.TransactionHash}}</span>
+                <span class="text-sm text-gray-900 font-mono break-all">{{.Order.GetTransactionHash}}</span>
             </div>
             {{end}}
             
@@ -156,7 +158,7 @@
                     </div>
                 </li>
                 
-                {{if .Order.PaymentReceivedAt}}
+                {{if .Order.HasPaymentReceived}}
                 <li>
                     <div class="relative pb-8">
                         <div class="relative flex space-x-3">
@@ -170,7 +172,7 @@
                                     <p class="text-sm text-gray-900">Payment received</p>
                                 </div>
                                 <div class="whitespace-nowrap text-right text-sm text-gray-500">
-                                    {{.Order.PaymentReceivedAt.Format "Jan 2, 3:04 PM"}}
+                                    {{.Order.GetPaymentReceivedAt.Format "Jan 2, 3:04 PM"}}
                                 </div>
                             </div>
                         </div>

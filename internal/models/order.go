@@ -75,6 +75,88 @@ func (o *Order) IsPaymentComplete() bool {
 	return o.Status == OrderStatusConfirmed
 }
 
+// HasAmountBTC checks if the order has a Bitcoin amount set
+func (o *Order) HasAmountBTC() bool {
+	return o.AmountBTC != nil && *o.AmountBTC > 0
+}
+
+// GetAmountBTC returns the Bitcoin amount or 0 if not set
+func (o *Order) GetAmountBTC() float64 {
+	if o.AmountBTC == nil {
+		return 0
+	}
+	return *o.AmountBTC
+}
+
+// HasQRCode checks if the order has QR code data
+func (o *Order) HasQRCode() bool {
+	return o.QRCodeData != nil && *o.QRCodeData != ""
+}
+
+// GetQRCodeData returns the QR code data or empty string if not set
+func (o *Order) GetQRCodeData() string {
+	if o.QRCodeData == nil {
+		return ""
+	}
+	return *o.QRCodeData
+}
+
+// HasTransactionHash checks if the order has a transaction hash
+func (o *Order) HasTransactionHash() bool {
+	return o.TransactionHash != nil && *o.TransactionHash != ""
+}
+
+// GetTransactionHash returns the transaction hash or empty string if not set
+func (o *Order) GetTransactionHash() string {
+	if o.TransactionHash == nil {
+		return ""
+	}
+	return *o.TransactionHash
+}
+
+// HasPaymentReceived checks if payment has been received
+func (o *Order) HasPaymentReceived() bool {
+	return o.PaymentReceivedAt != nil
+}
+
+// GetPaymentReceivedAt returns the payment received time or nil if not set
+func (o *Order) GetPaymentReceivedAt() *time.Time {
+	return o.PaymentReceivedAt
+}
+
+// HasExpiration checks if the order has an expiration time set
+func (o *Order) HasExpiration() bool {
+	return o.ExpiresAt != nil
+}
+
+// GetExpiresAt returns the expiration time or nil if not set
+func (o *Order) GetExpiresAt() *time.Time {
+	return o.ExpiresAt
+}
+
+// StatusColor returns a color class for the order status (template helper)
+func (o *Order) StatusColor() string {
+	return o.GetStatusColor()
+}
+
+// StatusDisplay returns a display-friendly status name
+func (o *Order) StatusDisplay() string {
+	switch o.Status {
+	case OrderStatusPending:
+		return "Pending Payment"
+	case OrderStatusPaid:
+		return "Payment Received"
+	case OrderStatusConfirmed:
+		return "Confirmed"
+	case OrderStatusExpired:
+		return "Expired"
+	case OrderStatusCancelled:
+		return "Cancelled"
+	default:
+		return string(o.Status)
+	}
+}
+
 // GetStatusColor returns a color class for the order status
 func (o *Order) GetStatusColor() string {
 	switch o.Status {
