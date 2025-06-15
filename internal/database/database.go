@@ -574,9 +574,9 @@ func MakeUserAdmin(userID string) error {
 func GetAllUsers() ([]models.User, error) {
 	var query string
 	if dbType == "postgres" {
-		query = "SELECT id, email, is_admin, force_password_reset, created_at, updated_at FROM users ORDER BY created_at DESC"
+		query = "SELECT id, email, is_admin, state, force_password_reset, created_at, updated_at, last_login FROM users ORDER BY created_at DESC"
 	} else {
-		query = "SELECT id, email, is_admin, force_password_reset, created_at, updated_at FROM users ORDER BY created_at DESC"
+		query = "SELECT id, email, is_admin, state, force_password_reset, created_at, updated_at, last_login FROM users ORDER BY created_at DESC"
 	}
 
 	rows, err := dbConn.Query(query)
@@ -588,7 +588,7 @@ func GetAllUsers() ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		user := models.User{}
-		if err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.State, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt, &user.LastLogin); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -828,13 +828,17 @@ func GetTotalRevenue() (float64, error) {
 func GetRecentOrders(limit int) ([]*models.Order, error) {
 	var query string
 	if dbType == "postgres" {
-		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
-				btc_address, status, confirmations, created_at, updated_at 
-				FROM orders ORDER BY created_at DESC LIMIT $1`
+		query = `SELECT o.id, o.user_id, o.order_number, o.description, o.amount_usd, o.amount_btc, 
+				o.btc_address, o.status, o.confirmations, o.created_at, o.updated_at, u.email as user_email
+				FROM orders o
+				JOIN users u ON o.user_id = u.id
+				ORDER BY o.created_at DESC LIMIT $1`
 	} else {
-		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
-				btc_address, status, confirmations, created_at, updated_at 
-				FROM orders ORDER BY created_at DESC LIMIT ?`
+		query = `SELECT o.id, o.user_id, o.order_number, o.description, o.amount_usd, o.amount_btc, 
+				o.btc_address, o.status, o.confirmations, o.created_at, o.updated_at, u.email as user_email
+				FROM orders o
+				JOIN users u ON o.user_id = u.id
+				ORDER BY o.created_at DESC LIMIT ?`
 	}
 
 	rows, err := dbConn.Query(query, limit)
@@ -846,12 +850,14 @@ func GetRecentOrders(limit int) ([]*models.Order, error) {
 	var orders []*models.Order
 	for rows.Next() {
 		order := &models.Order{}
+		var userEmail string
 		err := rows.Scan(&order.ID, &order.UserID, &order.OrderNumber, &order.Description,
 			&order.AmountUSD, &order.AmountBTC, &order.BTCAddress, &order.Status,
-			&order.Confirmations, &order.CreatedAt, &order.UpdatedAt)
+			&order.Confirmations, &order.CreatedAt, &order.UpdatedAt, &userEmail)
 		if err != nil {
 			return nil, err
 		}
+		order.User = &models.User{Email: userEmail}
 		orders = append(orders, order)
 	}
 
