@@ -606,27 +606,32 @@ func (api *Api) DeleteTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 func (api *Api) UnifiedAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// First, check for a Bearer token in the Authorization header
 		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			http.Error(w, "Authorization header required", http.StatusUnauthorized)
-			return
+		if authHeader != "" {
+			parts := strings.Split(authHeader, " ")
+			if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+				tokenStr := parts[1]
+				token, err := auth.ValidateToken(tokenStr)
+				if err == nil {
+					ctx := context.WithValue(r.Context(), "userID", token.UserID)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
 		}
 
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			http.Error(w, "Authorization header format must be Bearer {token}", http.StatusUnauthorized)
-			return
+		// If no valid Bearer token, check for a session cookie
+		cookie, err := r.Cookie("session")
+		if err == nil && cookie.Value != "" {
+			userID, err := auth.ValidateSession(cookie.Value)
+			if err == nil && userID != "" {
+				ctx := context.WithValue(r.Context(), "userID", userID)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
 		}
 
-		tokenStr := parts[1]
-		token, err := auth.ValidateToken(tokenStr)
-		if err != nil {
-			http.Error(w, "Invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		// Add user ID to context
-		ctx := context.WithValue(r.Context(), "userID", token.UserID)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		http.Error(w, "Unauthorized: A valid API token or session is required", http.StatusUnauthorized)
 	})
 }
