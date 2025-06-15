@@ -9,15 +9,28 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AccountState represents the current state of a user's account
+type AccountState string
+
+const (
+	AccountStateActive  AccountState = "active"  // Normal active account
+	AccountStateOnHold  AccountState = "on_hold" // Account temporarily suspended
+	AccountStatePaid    AccountState = "paid"    // Paid subscription account
+	AccountStateFree    AccountState = "free"    // Free tier account
+	AccountStateDeleted AccountState = "deleted" // Soft-deleted account
+)
+
 // User represents a user account in the database
 type User struct {
-	ID                 string    `json:"id" db:"id"`
-	Email              string    `json:"email" db:"email"`
-	Password           string    `json:"-" db:"password"`
-	IsAdmin            bool      `json:"is_admin" db:"is_admin"`
-	ForcePasswordReset bool      `json:"force_password_reset" db:"force_password_reset"`
-	CreatedAt          time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at" db:"updated_at"`
+	ID                 string       `json:"id" db:"id"`
+	Email              string       `json:"email" db:"email"`
+	Password           string       `json:"-" db:"password"`
+	IsAdmin            bool         `json:"is_admin" db:"is_admin"`
+	State              AccountState `json:"state" db:"state"`
+	ForcePasswordReset bool         `json:"force_password_reset" db:"force_password_reset"`
+	CreatedAt          time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at" db:"updated_at"`
+	LastLogin          time.Time    `json:"last_login" db:"last_login"`
 }
 
 // NewUser creates a new user with a hashed password
@@ -355,4 +368,14 @@ func (p *Payment) GetStatusColor() string {
 	default:
 		return "text-gray-600 bg-gray-100"
 	}
+}
+
+// IsActive returns true if the user's account is in an active state
+func (u *User) IsActive() bool {
+	return u.State == AccountStateActive || u.State == AccountStatePaid || u.State == AccountStateFree
+}
+
+// CanUseAPI returns true if the user can use the API
+func (u *User) CanUseAPI() bool {
+	return u.IsActive() && u.State != AccountStateOnHold
 }
