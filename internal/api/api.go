@@ -451,6 +451,67 @@ func (api *Api) ListJobFilesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(files)
 }
 
+// --- Auth Handlers ---
+
+func (api *Api) RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" || req.Password == "" {
+		http.Error(w, "Email and password are required", http.StatusBadRequest)
+		return
+	}
+
+	user, err := auth.RegisterUser(req.Email, req.Password)
+	if err != nil {
+		http.Error(w, "Registration failed", http.StatusInternalServerError)
+		return
+	}
+
+	// We don't return the user object, just a success status
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":      user.ID,
+		"email":   user.Email,
+		"message": "User registered successfully",
+	})
+}
+
+func (api *Api) LoginHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	user, err := auth.ValidateUser(req.Email, req.Password)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	// Note: This login handler is for the API. It does not set a session cookie.
+	// It's intended for clients that need to verify credentials before requesting
+	// an API token. A successful response here doesn't mean the user is "logged in"
+	// in a session-based sense.
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":      user.ID,
+		"message": "Login successful",
+	})
+}
+
 // --- Token Handlers ---
 
 func (api *Api) CreateTokenHandler(w http.ResponseWriter, r *http.Request) {
