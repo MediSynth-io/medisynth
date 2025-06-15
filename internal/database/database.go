@@ -175,16 +175,28 @@ func initSchema(db *sql.DB, dbType string) error {
 				token VARCHAR(255) UNIQUE NOT NULL,
 				name VARCHAR(255) NOT NULL,
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-				expires_at TIMESTAMP WITH TIME ZONE,
-				CONSTRAINT fk_tokens_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+				expires_at TIMESTAMP WITH TIME ZONE
 			)`,
 			`CREATE TABLE IF NOT EXISTS sessions (
 				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
 				user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 				token VARCHAR(255) UNIQUE NOT NULL,
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-				expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-				CONSTRAINT fk_sessions_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+				expires_at TIMESTAMP WITH TIME ZONE NOT NULL
+			)`,
+			`CREATE TABLE IF NOT EXISTS jobs (
+				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+				user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				job_id VARCHAR(255) NOT NULL UNIQUE,
+				status VARCHAR(50) NOT NULL,
+				parameters JSONB,
+				output_format VARCHAR(50),
+				output_path TEXT,
+				output_size BIGINT,
+				patient_count INTEGER,
+				error_message TEXT,
+				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+				completed_at TIMESTAMP WITH TIME ZONE
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
@@ -192,6 +204,8 @@ func initSchema(db *sql.DB, dbType string) error {
 			`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`,
 			`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`,
+			`CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)`,
 		}
 	} else {
 		// SQLite schema (original)
@@ -218,6 +232,21 @@ func initSchema(db *sql.DB, dbType string) error {
 				token TEXT UNIQUE NOT NULL,
 				created_at DATETIME NOT NULL,
 				expires_at DATETIME NOT NULL,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)`,
+			`CREATE TABLE IF NOT EXISTS jobs (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				job_id TEXT NOT NULL,
+				status TEXT NOT NULL,
+				parameters TEXT,
+				output_format TEXT,
+				output_path TEXT,
+				output_size INTEGER,
+				patient_count INTEGER,
+				error_message TEXT,
+				created_at DATETIME NOT NULL,
+				completed_at DATETIME,
 				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
