@@ -9,22 +9,35 @@ import (
 	"strings"
 	"time"
 
+	"context"
+	"sync"
+
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
+	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/models"
+	"github.com/MediSynth-io/medisynth/internal/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 )
 
 type Api struct {
-	Config config.Config
-	Router *chi.Mux
+	Config   config.Config
+	Router   *chi.Mux
+	S3Client *s3.Client
 }
 
 func NewApi(cfg config.Config) (*Api, error) {
+	s3Client, err := s3.NewClient(&cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create S3 client: %w", err)
+	}
+
 	api := &Api{
-		Config: cfg,
-		Router: chi.NewRouter(),
+		Config:   cfg,
+		Router:   chi.NewRouter(),
+		S3Client: s3Client,
 	}
 	api.setupRoutes()
 	return api, nil
@@ -103,8 +116,11 @@ func (api *Api) setupRoutes() {
 		r.Post("/tokens", api.CreateTokenHandler)
 		r.Get("/tokens", api.ListTokensHandler)
 		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
+
+		// Job-related routes
 		r.Post("/generate-patients", api.RunSyntheaGeneration)
 		r.Get("/generation-status/{jobID}", api.GetGenerationStatus)
+		r.Get("/jobs", api.ListJobsHandler)
 	})
 
 	// Swagger UI
@@ -181,52 +197,121 @@ func (api *Api) Heartbeat(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status":"ok"}`))
 }
 
+// --- Job Handlers ---
+
+var runningJobs = make(map[string]context.CancelFunc)
+var runningJobsMutex sync.Mutex
+
 func (api *Api) RunSyntheaGeneration(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in token", http.StatusUnauthorized)
+		return
+	}
+
+	var params models.SyntheaParams
+	if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	job := &models.Job{
+		ID:           "job-" + database.GenerateID(),
+		UserID:       userID,
+		JobID:        "synthea-" + database.GenerateID(),
+		Status:       models.JobStatusPending,
+		Parameters:   params.ToMap(),
+		OutputFormat: params.GetOutputFormat(),
+	}
+
+	if err := job.MarshalParameters(); err != nil {
+		http.Error(w, "Failed to process job parameters", http.StatusInternalServerError)
+		return
+	}
+
+	if err := database.CreateJob(job); err != nil {
+		log.Printf("ERROR: Failed to create job in database: %v", err)
+		http.Error(w, "Failed to create job", http.StatusInternalServerError)
+		return
+	}
+
+	go api.executeSyntheaJob(job)
+
 	w.Header().Set("Content-Type", "application/json")
-	var req struct {
-		Count      int `json:"count"`
-		Population int `json:"population"`
-		Age        int `json:"age,omitempty"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"error": "invalid JSON"})
-		return
-	}
-	patientCount := req.Count
-	if patientCount == 0 {
-		patientCount = req.Population
-	}
-	if patientCount == 0 {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"error": "count is required"})
-		return
-	}
-	// Create a job (simulate)
-	jobID := "job-123" // In real code, generate unique ID
-	job := &GenerationJob{
-		ID:        jobID,
-		Status:    StatusPending,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-	globalJobStore.AddJob(job)
 	w.WriteHeader(http.StatusAccepted)
-	json.NewEncoder(w).Encode(map[string]interface{}{"job_id": jobID, "jobID": jobID})
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"jobID":     job.ID,
+		"status":    job.Status,
+		"message":   "Job accepted and is pending execution.",
+		"statusUrl": fmt.Sprintf("/generation-status/%s", job.ID),
+	})
+}
+
+func (api *Api) executeSyntheaJob(job *models.Job) {
+	_, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	runningJobsMutex.Lock()
+	runningJobs[job.ID] = cancel
+	runningJobsMutex.Unlock()
+
+	defer func() {
+		runningJobsMutex.Lock()
+		delete(runningJobs, job.ID)
+		runningJobsMutex.Unlock()
+		cancel()
+	}()
+
+	log.Printf("Starting Synthea generation for job %s", job.ID)
+	database.UpdateJobStatus(job.ID, models.JobStatusRunning, nil, nil, nil, nil)
+
+	time.Sleep(10 * time.Second) // Simulate work
+
+	s3KeyPrefix := fmt.Sprintf("synthea_output/%s/", job.JobID)
+	log.Printf("Simulating S3 upload for job %s to path %s", job.ID, s3KeyPrefix)
+
+	population, _ := job.Parameters["population"].(float64)
+	patientCount := int(population)
+
+	err := database.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil, &s3KeyPrefix, nil, &patientCount)
+	if err != nil {
+		log.Printf("ERROR: Failed to update job %s to completed: %v", job.ID, err)
+		return
+	}
+
+	log.Printf("Job %s completed successfully", job.ID)
 }
 
 func (api *Api) GetGenerationStatus(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	jobID := chi.URLParam(r, "jobID")
-	job, exists := globalJobStore.GetJob(jobID)
-	if !exists {
-		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{"error": "job not found"})
+	job, err := database.GetJobByID(jobID)
+	if err != nil {
+		http.Error(w, "Job not found", http.StatusNotFound)
 		return
 	}
-	resp := map[string]interface{}{"status": string(job.Status)}
-	if job.Status == StatusCompleted {
-		resp["progress"] = 100
+
+	userID, _ := r.Context().Value("userID").(string)
+	if job.UserID != userID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
 	}
-	json.NewEncoder(w).Encode(resp)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(job)
+}
+
+func (api *Api) ListJobsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok || userID == "" {
+		http.Error(w, "Unauthorized: User ID not found in token", http.StatusUnauthorized)
+		return
+	}
+
+	jobs, err := database.GetJobsByUserID(userID)
+	if err != nil {
+		log.Printf("ERROR: Failed to get jobs for user %s: %v", userID, err)
+		http.Error(w, "Failed to retrieve job history", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(jobs)
 }

@@ -538,7 +538,7 @@ func CleanupExpiredSessions() error {
 	return err
 }
 
-// generateID generates a unique ID
+// generateID generates a unique ID for SQLite, not needed for PostgreSQL
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }

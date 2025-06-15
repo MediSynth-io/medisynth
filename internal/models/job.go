@@ -42,6 +42,64 @@ type JobFile struct {
 	URL      string `json:"url"` // Presigned download URL
 }
 
+// SyntheaParams represents the parameters for a Synthea generation job
+type SyntheaParams struct {
+	Population    *int     `json:"population"`
+	OutputFormat  *string  `json:"outputFormat,omitempty"`
+	KeepModules   []string `json:"keepModules,omitempty"`
+	CustomModules []string `json:"customModules,omitempty"`
+	State         *string  `json:"state,omitempty"`
+	City          *string  `json:"city,omitempty"`
+	Gender        *string  `json:"gender,omitempty"`
+	AgeMin        *int     `json:"ageMin,omitempty"`
+	AgeMax        *int     `json:"ageMax,omitempty"`
+	Seed          *int64   `json:"seed,omitempty"`
+}
+
+// GetOutputFormat returns the output format, defaulting to "fhir"
+func (p *SyntheaParams) GetOutputFormat() string {
+	if p.OutputFormat != nil {
+		return *p.OutputFormat
+	}
+	return "fhir"
+}
+
+// ToMap converts the params to a map for JSON storage
+func (p *SyntheaParams) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+	if p.Population != nil {
+		m["population"] = *p.Population
+	}
+	if p.OutputFormat != nil {
+		m["outputFormat"] = *p.OutputFormat
+	}
+	if len(p.KeepModules) > 0 {
+		m["keepModules"] = p.KeepModules
+	}
+	if len(p.CustomModules) > 0 {
+		m["customModules"] = p.CustomModules
+	}
+	if p.State != nil {
+		m["state"] = *p.State
+	}
+	if p.City != nil {
+		m["city"] = *p.City
+	}
+	if p.Gender != nil {
+		m["gender"] = *p.Gender
+	}
+	if p.AgeMin != nil {
+		m["ageMin"] = *p.AgeMin
+	}
+	if p.AgeMax != nil {
+		m["ageMax"] = *p.AgeMax
+	}
+	if p.Seed != nil {
+		m["seed"] = *p.Seed
+	}
+	return m
+}
+
 // MarshalParameters converts the Parameters map to JSON for database storage
 func (j *Job) MarshalParameters() error {
 	if j.Parameters == nil {
