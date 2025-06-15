@@ -18,6 +18,20 @@ type User struct {
 	UpdatedAt          time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// NewUser creates a new user with a hashed password
+func NewUser(email, password string) (*User, error) {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	return &User{
+		Email:     email,
+		Password:  string(hashedPassword),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+	}, nil
+}
+
 // ValidatePassword checks if the provided password is valid for the user.
 func (u *User) ValidatePassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
@@ -147,6 +161,8 @@ type JobFile struct {
 	URL       string    `json:"url"`
 }
 
+// --- Helper Methods ---
+
 // MarshalParameters converts the Parameters struct to JSON bytes for the database.
 func (j *Job) MarshalParameters() error {
 	if j.Parameters == nil {
@@ -173,9 +189,6 @@ func (j *Job) UnmarshalParameters() error {
 	j.Parameters = params
 	return nil
 }
-
-// --- Template Helper Methods ---
-// These are methods attached to the models to help with presentation logic in templates.
 
 // IsExpired checks if the order has expired
 func (o *Order) IsExpired() bool {
@@ -221,5 +234,96 @@ func (o *Order) StatusColor() string {
 		return "bg-red-100 text-red-800"
 	default:
 		return "bg-gray-100 text-gray-800"
+	}
+}
+
+// HasAmountBTC checks if the order has a Bitcoin amount set
+func (o *Order) HasAmountBTC() bool {
+	return o.AmountBTC != nil && *o.AmountBTC > 0
+}
+
+// GetAmountBTC returns the Bitcoin amount or 0 if not set
+func (o *Order) GetAmountBTC() float64 {
+	if o.AmountBTC == nil {
+		return 0
+	}
+	return *o.AmountBTC
+}
+
+// HasQRCode checks if the order has QR code data
+func (o *Order) HasQRCode() bool {
+	return o.QRCodeData != nil && *o.QRCodeData != ""
+}
+
+// GetQRCodeData returns the QR code data or empty string if not set
+func (o *Order) GetQRCodeData() string {
+	if o.QRCodeData == nil {
+		return ""
+	}
+	return *o.QRCodeData
+}
+
+// HasTransactionHash checks if the order has a transaction hash
+func (o *Order) HasTransactionHash() bool {
+	return o.TransactionHash != nil && *o.TransactionHash != ""
+}
+
+// GetTransactionHash returns the transaction hash or empty string if not set
+func (o *Order) GetTransactionHash() string {
+	if o.TransactionHash == nil {
+		return ""
+	}
+	return *o.TransactionHash
+}
+
+// HasPaymentReceived checks if payment has been received
+func (o *Order) HasPaymentReceived() bool {
+	return o.PaymentReceivedAt != nil
+}
+
+// GetPaymentReceivedAt returns the payment received time or nil if not set
+func (o *Order) GetPaymentReceivedAt() *time.Time {
+	return o.PaymentReceivedAt
+}
+
+// HasExpiration checks if the order has an expiration time set
+func (o *Order) HasExpiration() bool {
+	return o.ExpiresAt != nil
+}
+
+// GetExpiresAt returns the expiration time or nil if not set
+func (o *Order) GetExpiresAt() *time.Time {
+	return o.ExpiresAt
+}
+
+// JobStatusColor returns a Tailwind CSS color class based on the job status.
+func (j *Job) JobStatusColor() string {
+	switch j.Status {
+	case JobStatusPending:
+		return "text-yellow-600 bg-yellow-100"
+	case JobStatusRunning:
+		return "text-blue-600 bg-blue-100"
+	case JobStatusCompleted:
+		return "text-green-600 bg-green-100"
+	case JobStatusFailed:
+		return "text-red-600 bg-red-100"
+	default:
+		return "text-gray-600 bg-gray-100"
+	}
+}
+
+// GetPaymentStatusColor returns a color class for the payment status
+func (p *Payment) GetStatusColor() string {
+	switch p.Status {
+	case PaymentStatusPending:
+		return "text-yellow-600 bg-yellow-100"
+	case PaymentStatusDetected:
+		return "text-blue-600 bg-blue-100"
+	case PaymentStatusConfirmed:
+		return "text-green-600 bg-green-100"
+	case PaymentStatusFailed:
+		return "text-red-600 bg-red-100"
+	default:
+		return "text-gray-600 bg-gray-100"
 	}
 }
