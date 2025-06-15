@@ -122,7 +122,7 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("ADMIN_EMAILS", "")
 	v.SetDefault("BITCOIN_ADDRESS", "")
 
-	// Explicitly bind environment variables
+	// Explicitly bind all environment variables to ensure they are read
 	envVars := []string{
 		"API_PORT", "API_URL", "API_INTERNAL_URL",
 		"DB_TYPE", "DB_PATH", "DB_SOCKET_PATH", "DB_WAL_MODE", "DB_MAX_RETRIES", "DB_RETRY_DELAY",
@@ -134,8 +134,9 @@ func LoadConfig() (*Config, error) {
 	}
 
 	for _, envVar := range envVars {
-		if err := v.BindEnv(envVar); err != nil {
-			log.Printf("Warning: failed to bind environment variable %s: %v", envVar, err)
+		err := v.BindEnv(strings.ToLower(strings.ReplaceAll(envVar, "_", ".")))
+		if err != nil {
+			log.Printf("Warning: could not bind env var %s: %v", envVar, err)
 		}
 	}
 
@@ -144,17 +145,23 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	// Parse comma-separated admin emails
+	// For ADMIN_EMAILS, viper's automatic string-to-slice conversion is tricky with env vars.
+	// We handle it manually for robustness.
 	adminEmailsStr := v.GetString("ADMIN_EMAILS")
 	if adminEmailsStr != "" {
 		cfg.AdminEmails = strings.Split(adminEmailsStr, ",")
-		// Trim whitespace from each email
 		for i, email := range cfg.AdminEmails {
 			cfg.AdminEmails[i] = strings.TrimSpace(email)
 		}
 	}
 
-	log.Printf("Configuration loaded successfully with %d admin emails", len(cfg.AdminEmails))
+	log.Printf("Configuration loaded successfully. Admin emails count: %d", len(cfg.AdminEmails))
+	if cfg.BitcoinAddress != "" {
+		log.Printf("Bitcoin address loaded: %s", cfg.BitcoinAddress)
+	} else {
+		log.Printf("Warning: BITCOIN_ADDRESS is not set in the environment.")
+	}
+
 	return &cfg, nil
 }
 
