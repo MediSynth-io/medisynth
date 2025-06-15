@@ -1,7 +1,6 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
-	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/portal"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -22,33 +20,43 @@ import (
 type Api struct {
 	Config config.Config
 	portal *portal.Portal
+	Router *chi.Mux
 }
 
-func NewApi(config config.Config) (*Api, error) {
-	if config.APIPort == 0 {
-		return nil, errors.New("Must have at least a port to start API")
+func NewApi(cfg config.Config) (*Api, error) {
+	api := &Api{
+		Config: cfg,
+		Router: chi.NewRouter(),
 	}
 
-	// Initialize database
-	if err := database.Init(&config); err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %v", err)
-	}
+	// Initialize other components like portal if necessary
+	// portal, err := portal.New(&cfg)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// api.portal = portal
 
-	// Initialize auth with config
-	auth.InitAuth(&config)
+	api.setupRoutes()
+	return api, nil
+}
 
-	// Initialize portal with config
-	p, err := portal.New(&config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize portal: %v", err)
-	}
+func (api *Api) setupRoutes() {
+	r := api.Router
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Heartbeat("/heartbeat"))
 
-	api := Api{
-		Config: config,
-		portal: p,
-	}
+	// Public routes
+	r.Post("/register", api.RegisterHandler)
+	r.Post("/login", api.LoginHandler)
 
-	return &api, nil
+	// Protected routes for token management
+	r.Group(func(r chi.Router) {
+		r.Use(api.TokenAuthMiddleware)
+		r.Post("/tokens", api.CreateTokenHandler)
+		r.Get("/tokens", api.ListTokensHandler)
+		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
+	})
 }
 
 func (api *Api) Serve() {
@@ -109,6 +117,24 @@ func (api *Api) Serve() {
 	r.Group(func(r chi.Router) {
 		r.Use(DomainMiddleware(api.portal.Routes(), api.Routes(), &api.Config))
 	})
+
+	// Serve the swagger-ui and the spec
+	r.Handle("/swagger/*", http.StripPrefix("/swagger/", http.FileServer(http.Dir("./swagger-ui"))))
+
+	// Auth routes
+	r.Post("/register", api.RegisterHandler)
+	r.Post("/login", api.LoginHandler)
+
+	// Protected routes for token management
+	r.Group(func(r chi.Router) {
+		r.Use(api.TokenAuthMiddleware)
+		r.Post("/tokens", api.CreateTokenHandler)
+		r.Get("/tokens", api.ListTokensHandler)
+		r.Delete("/tokens/{tokenID}", api.DeleteTokenHandler)
+	})
+
+	// Add a simple heartbeat endpoint
+	r.Get("/heartbeat", api.Heartbeat)
 
 	// Start session cleanup goroutine
 	go func() {
