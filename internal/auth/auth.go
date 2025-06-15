@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/models"
@@ -136,4 +137,58 @@ func DeleteSession(token string) error {
 // CleanupExpiredSessions removes expired session records from the database.
 func CleanupExpiredSessions() error {
 	return dataStore.CleanupExpiredSessions()
+}
+
+// --- Validation Helpers ---
+
+// PasswordRequirements defines the complexity requirements for a password
+type PasswordRequirements struct {
+	MinLength int
+	HasUpper  bool
+	HasLower  bool
+	HasNumber bool
+	HasSymbol bool
+}
+
+// GetPasswordRequirements returns the current password policy
+func GetPasswordRequirements() PasswordRequirements {
+	return PasswordRequirements{
+		MinLength: 8,
+		HasUpper:  true,
+		HasLower:  true,
+		HasNumber: true,
+		HasSymbol: true,
+	}
+}
+
+// ValidatePassword checks if a password meets the complexity requirements.
+func ValidatePassword(password string) bool {
+	var (
+		hasUpper  bool
+		hasLower  bool
+		hasNumber bool
+		hasSymbol bool
+	)
+	if len(password) < GetPasswordRequirements().MinLength {
+		return false
+	}
+	for _, char := range password {
+		switch {
+		case 'A' <= char && char <= 'Z':
+			hasUpper = true
+		case 'a' <= char && char <= 'z':
+			hasLower = true
+		case '0' <= char && char <= '9':
+			hasNumber = true
+		default:
+			hasSymbol = true
+		}
+	}
+	return hasUpper && hasLower && hasNumber && hasSymbol
+}
+
+// ValidateEmail checks if an email has a valid format.
+func ValidateEmail(email string) bool {
+	// A very basic email validation check
+	return strings.Contains(email, "@") && strings.Contains(email, ".")
 }

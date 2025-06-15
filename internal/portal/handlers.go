@@ -106,7 +106,16 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 
-	data := map[string]interface{}{"Email": email}
+	data := map[string]interface{}{
+		"Email":                email,
+		"PasswordRequirements": auth.GetPasswordRequirements(),
+	}
+
+	if !auth.ValidateEmail(email) {
+		data["Error"] = "Please enter a valid email address"
+		p.renderTemplate(w, r, "register.html", "Register", data)
+		return
+	}
 
 	if password != confirmPassword {
 		data["Error"] = "Passwords do not match"
@@ -114,17 +123,30 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !auth.ValidatePassword(password) {
+		data["Error"] = "Password does not meet the requirements"
+		p.renderTemplate(w, r, "register.html", "Register", data)
+		return
+	}
+
 	user, err := auth.RegisterUser(email, password)
 	if err != nil {
-		data["Error"] = "Registration failed. Please try again."
+		if strings.Contains(err.Error(), "UNIQUE constraint") || strings.Contains(err.Error(), "duplicate key") {
+			data["Error"] = "This email is already registered."
+		} else {
+			data["Error"] = "Registration failed. Please try again later."
+			log.Printf("ERROR: Failed to register user %s: %v", email, err)
+		}
 		p.renderTemplate(w, r, "register.html", "Register", data)
 		return
 	}
 
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		data["Error"] = "Registration successful but could not log in."
-		p.renderTemplate(w, r, "register.html", "Register", data)
+		log.Printf("ERROR: User %s registered but session creation failed: %v", email, err)
+		// User is registered, but we can't log them in.
+		// Redirect to login with a message.
+		http.Redirect(w, r, "/login?info=registration_success", http.StatusSeeOther)
 		return
 	}
 
