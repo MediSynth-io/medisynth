@@ -4,7 +4,7 @@ metadata:
   name: medisynth-portal
   namespace: medisynth-io
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: medisynth-portal
@@ -33,7 +33,7 @@ spec:
               cpu: "50m"
             limits:
               memory: "256Mi"
-              cpu: "250m"
+              cpu: "500m"
       volumes:
         - name: config
           configMap:

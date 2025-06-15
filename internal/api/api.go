@@ -33,8 +33,34 @@ func NewApi(cfg config.Config) (*Api, error) {
 func (api *Api) setupRoutes() {
 	r := api.Router
 
-	// Middleware
-	r.Use(middleware.Logger)
+	// Enhanced middleware with real IP logging
+	r.Use(middleware.RealIP)
+	r.Use(middleware.RequestID)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+
+			defer func() {
+				clientIP := middleware.GetReqID(r.Context())
+				if clientIP == "" {
+					clientIP = r.RemoteAddr
+				}
+				// Get real client IP from headers
+				if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+					clientIP = realIP
+				} else if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+					clientIP = strings.Split(forwarded, ",")[0]
+				}
+
+				log.Printf("[API] %s %s %s %d %d bytes in %v - Real IP: %s",
+					r.Method, r.URL.Path, r.Proto, ww.Status(), ww.BytesWritten(),
+					time.Since(start), clientIP)
+			}()
+
+			next.ServeHTTP(ww, r)
+		})
+	})
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://*.local:*", "http://localhost:*", "http://127.0.0.1:*"},
@@ -44,6 +70,23 @@ func (api *Api) setupRoutes() {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+
+	// Root API info endpoint
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"service": "MediSynth API",
+			"version": "v1.0.0",
+			"status":  "running",
+			"endpoints": map[string]string{
+				"health":   "/heartbeat",
+				"docs":     "/swagger/",
+				"generate": "/generate-patients",
+				"status":   "/generation-status/{jobID}",
+			},
+		})
+	})
 
 	// Public routes
 	r.Get("/heartbeat", api.Heartbeat)
