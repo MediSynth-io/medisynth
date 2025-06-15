@@ -4,8 +4,8 @@ WORKDIR /app
 COPY . .
 RUN CGO_ENABLED=1 go build -o /app/medisynth-api ./cmd/api/main.go
 
-# Use a minimal alpine image for the final stage
-FROM alpine:latest
+# Use a debian-based image for the final stage
+FROM debian:stable-slim
 WORKDIR /app
 COPY --from=builder /app/medisynth-api /app/medisynth-api
 CMD ["./medisynth-api"] 
