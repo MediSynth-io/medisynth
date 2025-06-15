@@ -59,3 +59,8 @@ func (s *Store) ValidateSession(token string) (*models.Session, error) {
 func (s *Store) DeleteSession(token string) error {
 	return database.DeleteSession(token)
 }
+
+// CleanupExpiredSessions removes expired sessions from the database.
+func (s *Store) CleanupExpiredSessions() error {
+	return database.CleanupExpiredSessions()
+}

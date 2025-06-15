@@ -132,3 +132,8 @@ func ValidateSession(token string) (string, error) {
 func DeleteSession(token string) error {
 	return dataStore.DeleteSession(token)
 }
+
+// CleanupExpiredSessions removes expired session records from the database.
+func CleanupExpiredSessions() error {
+	return dataStore.CleanupExpiredSessions()
+}

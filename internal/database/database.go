@@ -528,14 +528,9 @@ func DeleteSession(token string) error {
 	return err
 }
 
-// CleanupExpiredSessions deletes all expired sessions
+// CleanupExpiredSessions removes all sessions that have passed their expiration time.
 func CleanupExpiredSessions() error {
-	var query string
-	if dbType == "postgres" {
-		query = "DELETE FROM sessions WHERE expires_at < $1"
-	} else {
-		query = "DELETE FROM sessions WHERE expires_at < ?"
-	}
+	query := `DELETE FROM sessions WHERE expires_at < $1`
 	_, err := dbConn.Exec(query, time.Now())
 	return err
 }
