@@ -387,21 +387,35 @@ func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmplName
 
 	// Add user context and active page info
 	templateData["ActivePage"] = pageTitle
-	if userID, ok := r.Context().Value("userID").(string); ok {
+
+	// Only try to fetch user data if there's a userID in the context
+	if userID, ok := r.Context().Value("userID").(string); ok && userID != "" {
 		user, err := database.GetUserByID(userID)
-		if err == nil {
+		if err != nil {
+			log.Printf("Warning: Failed to get user data for ID %s: %v", userID, err)
+			// Don't fail the template rendering, just log the warning
+		} else {
 			templateData["User"] = user
 		}
 	}
 
-	log.Printf("Executing template %s with data: %+v", tmplName, templateData)
-	err := ts.ExecuteTemplate(w, "base.html", templateData)
+	log.Printf("Executing template %s with data keys: %v", tmplName, getMapKeys(templateData))
+	err := ts.ExecuteTemplate(w, "base", templateData)
 	if err != nil {
 		log.Printf("Error rendering template %s: %v", tmplName, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 	log.Printf("Successfully rendered template: %s", tmplName)
+}
+
+// Helper function to get map keys for logging
+func getMapKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // responseWriter is a wrapper around http.ResponseWriter that includes the request context
