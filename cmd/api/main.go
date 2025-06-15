@@ -14,7 +14,7 @@ const version = "0.0.1"
 
 func initializeAPI() (*api.Api, error) {
 	// Load configuration
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Init()
 	if err != nil {
 		return nil, err
 	}

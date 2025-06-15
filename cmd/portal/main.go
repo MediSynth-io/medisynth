@@ -14,7 +14,7 @@ import (
 const version = "0.0.1"
 
 func initializePortal() (http.Handler, error) {
-	cfg, err := config.LoadConfig()
+	cfg, err := config.Init()
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func main() {
 	// Get port from environment variable, fallback to config file
 	port := os.Getenv("API_PORT")
 	if port == "" {
-		cfg, err := config.LoadConfig()
+		cfg, err := config.Init()
 		if err != nil {
 			log.Fatal(err)
 		}
