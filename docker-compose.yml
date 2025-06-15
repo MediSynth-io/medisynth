@@ -27,6 +27,7 @@ services:
       - SERVICE_TYPE=portal
       - MEDISYNTH_ENV=${MEDISYNTH_ENV:-dev}
       - MEDISYNTH_API_PORT=8081
+      - API_INTERNAL_URL=http://medisynth-api:8081
     volumes:
       - ./static:/app/static
       - ./templates:/app/templates

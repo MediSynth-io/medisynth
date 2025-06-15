@@ -99,7 +99,7 @@ func (p *Portal) Routes() http.Handler {
 
 		r.Get("/dashboard", p.handleDashboard)
 		r.Get("/documentation", p.handleDocumentation)
-		r.Handle("/swagger/*", p.handleSwaggerProxy)
+		r.Handle("/swagger/*", http.HandlerFunc(p.handleSwaggerProxy))
 		r.Get("/jobs", p.handleJobs)
 		r.Get("/jobs/new", p.handleNewJob)
 		r.Post("/jobs/new", p.handleCreateJob)

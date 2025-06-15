@@ -82,8 +82,8 @@ func (p *Portal) handleSwaggerProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create API URL (assuming API runs on port 8081)
-	apiURL := "http://medisynth-api:8081" + r.URL.Path
+	// Create API URL using configured internal URL
+	apiURL := p.config.APIInternalURL + r.URL.Path
 	if r.URL.RawQuery != "" {
 		apiURL += "?" + r.URL.RawQuery
 	}
