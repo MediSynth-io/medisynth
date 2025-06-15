@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -94,7 +95,10 @@ func (p *Portal) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleRegister(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[REGISTER] Handling register GET request from %s", r.RemoteAddr)
+	email := r.FormValue("email")
+	ip := r.RemoteAddr
+
+	logRequest(r, "REGISTER", "Registration attempt for email:", email, "from IP:", ip)
 
 	// Get password requirements
 	passwordReqs := auth.GetPasswordRequirements()
@@ -235,26 +239,74 @@ func (p *Portal) handleSwaggerProxy(w http.ResponseWriter, r *http.Request) {
 func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
+	ip := r.RemoteAddr
 
-	logRequest(r, "LOGIN", "Login attempt for email:", email)
+	logRequest(r, "LOGIN", "Login attempt for email:", email, "from IP:", ip)
+
+	// Check if login is blocked
+	blocked, remainingTime, err := database.IsLoginBlocked(email, ip)
+	if err != nil {
+		logRequest(r, "LOGIN", "Error checking login block:", err)
+	} else if blocked {
+		minutes := int(remainingTime.Minutes())
+		seconds := int(remainingTime.Seconds()) % 60
+		message := fmt.Sprintf("Too many failed attempts. Please try again in %d minutes and %d seconds.", minutes, seconds)
+		logRequest(r, "LOGIN", "Login blocked for", email, "from IP:", ip, "remaining time:", remainingTime)
+		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{
+			"Error": message,
+			"Email": email,
+		})
+		return
+	}
 
 	user, err := auth.ValidateUser(email, password)
 	if err != nil {
-		logRequest(r, "LOGIN", "User validation failed for", email, ":", err)
+		// Track failed attempt
+		if err := database.TrackLoginAttempt(email, ip, false); err != nil {
+			logRequest(r, "LOGIN", "Failed to track login attempt:", err)
+		}
+		logRequest(r, "LOGIN", "User validation failed for", email, "from IP:", ip, ":", err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Invalid email or password", "Email": email})
 		return
 	}
 
-	logRequest(r, "LOGIN", "User validation successful")
+	// Track successful attempt
+	if err := database.TrackLoginAttempt(email, ip, true); err != nil {
+		logRequest(r, "LOGIN", "Failed to track successful login:", err)
+	}
+
+	// Check if this is a new IP
+	isNewIP, err := database.IsNewIP(user.ID, ip)
+	if err != nil {
+		logRequest(r, "LOGIN", "Error checking IP history:", err)
+	} else if isNewIP {
+		// Get user's account age
+		accountAge := time.Since(user.CreatedAt)
+		if accountAge < 90*24*time.Hour { // Less than 90 days old
+			logRequest(r, "LOGIN", "New IP detected for new account:", email, "from IP:", ip)
+			p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{
+				"Warning": "This appears to be a new login location. Please verify this is you.",
+				"Email":   email,
+			})
+			return
+		}
+	}
+
+	// Track the IP
+	if err := database.TrackUserIP(user.ID, ip); err != nil {
+		logRequest(r, "LOGIN", "Failed to track IP:", err)
+	}
+
+	logRequest(r, "LOGIN", "User validation successful for", email, "from IP:", ip)
 
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		logRequest(r, "LOGIN", "Session creation failed:", err)
+		logRequest(r, "LOGIN", "Session creation failed for", email, "from IP:", ip, ":", err)
 		p.renderTemplate(w, r, "login.html", "Login", map[string]interface{}{"Error": "Failed to create session.", "Email": email})
 		return
 	}
 
-	logRequest(r, "LOGIN", "Session created successfully, token length:", len(token))
+	logRequest(r, "LOGIN", "Session created successfully for", email, "from IP:", ip, "token length:", len(token))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -267,7 +319,7 @@ func (p *Portal) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	logRequest(r, "LOGIN", "Session cookie set, redirecting to dashboard")
+	logRequest(r, "LOGIN", "Session cookie set for", email, "from IP:", ip, "redirecting to dashboard")
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -318,18 +370,16 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logRequest(r, "REGISTER", "User registered successfully")
+	logRequest(r, "REGISTER", "User registered successfully:", email, "from IP:", getRealIP(r))
 
 	token, err := auth.CreateSession(user.ID)
 	if err != nil {
-		logRequest(r, "REGISTER", "User registered but session creation failed:", err)
-		// User is registered, but we can't log them in.
-		// Redirect to login with a message.
+		logRequest(r, "REGISTER", "User registered but session creation failed for", email, "from IP:", getRealIP(r), ":", err)
 		http.Redirect(w, r, "/login?info=registration_success", http.StatusSeeOther)
 		return
 	}
 
-	logRequest(r, "REGISTER", "Session created successfully for new user, token length:", len(token))
+	logRequest(r, "REGISTER", "Session created successfully for new user", email, "from IP:", getRealIP(r), "token length:", len(token))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -342,7 +392,7 @@ func (p *Portal) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 		Expires:  time.Now().Add(24 * time.Hour),
 	})
 
-	logRequest(r, "REGISTER", "Registration complete, redirecting to dashboard")
+	logRequest(r, "REGISTER", "Registration complete for", email, "from IP:", getRealIP(r), "redirecting to dashboard")
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
@@ -459,12 +509,16 @@ func (p *Portal) handleDeleteToken(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
-	logRequest(r, "LOGOUT", "User logged out")
+	userID, ok := r.Context().Value("userID").(string)
+	ip := r.RemoteAddr
 
-	cookie, err := r.Cookie("session")
-	if err == nil {
-		auth.DeleteSession(cookie.Value)
+	if ok {
+		user, err := database.GetUserByID(userID)
+		if err == nil {
+			logRequest(r, "LOGOUT", "User logged out:", user.Email, "from IP:", ip)
+		}
 	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
 		Value:    "",
@@ -475,7 +529,8 @@ func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 		Expires:  time.Unix(0, 0),
 	})
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (p *Portal) handleJobs(w http.ResponseWriter, r *http.Request) {
@@ -981,5 +1036,34 @@ func (p *Portal) handleJobOutputs(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "job-outputs.html", "Job Outputs", map[string]interface{}{
 		"JobID": jobID,
 		"Files": files,
+	})
+}
+
+func (p *Portal) requireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := r.Context().Value("userID").(string)
+		ip := r.RemoteAddr
+
+		if !ok {
+			logRequest(r, "ADMIN_AUTH", "Forbidden: No user ID in context from IP:", ip)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		user, err := database.GetUserByID(userID)
+		if err != nil {
+			logRequest(r, "ADMIN_AUTH", "Forbidden: User not found with ID:", userID, "from IP:", ip, "Error:", err)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		if !p.config.IsAdmin(user.Email) {
+			logRequest(r, "ADMIN_AUTH", "Forbidden: User is not an admin:", user.Email, "from IP:", ip)
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		logRequest(r, "ADMIN_AUTH", "Admin access granted for", user.Email, "from IP:", ip)
+		next.ServeHTTP(w, r)
 	})
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -213,6 +214,21 @@ func initSchema(db *sql.DB, dbType string) error {
 				confirmed_at TIMESTAMP WITH TIME ZONE,
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 			)`,
+			`CREATE TABLE IF NOT EXISTS user_ips (
+				id SERIAL PRIMARY KEY,
+				user_id TEXT NOT NULL REFERENCES users(id),
+				ip_address TEXT NOT NULL,
+				first_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(user_id, ip_address)
+			)`,
+			`CREATE TABLE IF NOT EXISTS login_attempts (
+				id SERIAL PRIMARY KEY,
+				email TEXT NOT NULL,
+				ip_address TEXT NOT NULL,
+				attempt_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				success BOOLEAN NOT NULL DEFAULT FALSE
+			)`,
 			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_token ON tokens(token)`,
@@ -226,6 +242,8 @@ func initSchema(db *sql.DB, dbType string) error {
 			`CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)`,
 			`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_payments_transaction_hash ON payments(transaction_hash)`,
+			`CREATE INDEX IF NOT EXISTS idx_login_attempts_email_ip ON login_attempts(email, ip_address)`,
+			`CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempt_time)`,
 		}
 	} else {
 		// SQLite schema (original)
@@ -300,6 +318,21 @@ func initSchema(db *sql.DB, dbType string) error {
 				created_at DATETIME NOT NULL,
 				FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 			)`,
+			`CREATE TABLE IF NOT EXISTS user_ips (
+				id SERIAL PRIMARY KEY,
+				user_id TEXT NOT NULL REFERENCES users(id),
+				ip_address TEXT NOT NULL,
+				first_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				last_seen TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				UNIQUE(user_id, ip_address)
+			)`,
+			`CREATE TABLE IF NOT EXISTS login_attempts (
+				id SERIAL PRIMARY KEY,
+				email TEXT NOT NULL,
+				ip_address TEXT NOT NULL,
+				attempt_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+				success BOOLEAN NOT NULL DEFAULT FALSE
+			)`,
 			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
@@ -311,6 +344,8 @@ func initSchema(db *sql.DB, dbType string) error {
 			`CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)`,
 			`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_payments_transaction_hash ON payments(transaction_hash)`,
+			`CREATE INDEX IF NOT EXISTS idx_login_attempts_email_ip ON login_attempts(email, ip_address)`,
+			`CREATE INDEX IF NOT EXISTS idx_login_attempts_time ON login_attempts(attempt_time)`,
 		}
 	}
 
@@ -1253,4 +1288,140 @@ func UpdateOrder(order *models.Order) error {
 	}
 	_, err := dbConn.Exec(query, order.Description, order.AmountUSD, order.AmountBTC, order.Status, time.Now(), order.ID)
 	return err
+}
+
+// TrackUserIP adds a new IP address to the user_ips table
+func TrackUserIP(userID string, ipAddress string) error {
+	query := `
+		INSERT INTO user_ips (user_id, ip_address)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, ip_address) 
+		DO UPDATE SET last_seen = CURRENT_TIMESTAMP
+	`
+	_, err := dbConn.Exec(query, userID, ipAddress)
+	return err
+}
+
+// IsNewIP checks if a given IP address is new for a user
+func IsNewIP(userID string, ipAddress string) (bool, error) {
+	var count int
+	query := `
+		SELECT COUNT(*) 
+		FROM user_ips 
+		WHERE user_id = $1 AND ip_address = $2
+	`
+	err := dbConn.QueryRow(query, userID, ipAddress).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count == 0, nil
+}
+
+// GetUserIPs retrieves all IP addresses for a user
+func GetUserIPs(userID string) ([]struct {
+	IPAddress string
+	FirstSeen time.Time
+	LastSeen  time.Time
+}, error) {
+	query := `
+		SELECT ip_address, first_seen, last_seen
+		FROM user_ips
+		WHERE user_id = $1
+		ORDER BY last_seen DESC
+	`
+	rows, err := dbConn.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ips []struct {
+		IPAddress string
+		FirstSeen time.Time
+		LastSeen  time.Time
+	}
+
+	for rows.Next() {
+		var ip struct {
+			IPAddress string
+			FirstSeen time.Time
+			LastSeen  time.Time
+		}
+		if err := rows.Scan(&ip.IPAddress, &ip.FirstSeen, &ip.LastSeen); err != nil {
+			return nil, err
+		}
+		ips = append(ips, ip)
+	}
+	return ips, nil
+}
+
+// TrackLoginAttempt records a login attempt
+func TrackLoginAttempt(email, ipAddress string, success bool) error {
+	query := `
+		INSERT INTO login_attempts (email, ip_address, success)
+		VALUES ($1, $2, $3)
+	`
+	_, err := dbConn.Exec(query, email, ipAddress, success)
+	return err
+}
+
+// GetFailedAttempts returns the number of failed attempts in the last hour
+func GetFailedAttempts(email, ipAddress string) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM login_attempts 
+		WHERE email = $1 
+		AND ip_address = $2 
+		AND success = FALSE 
+		AND attempt_time > NOW() - INTERVAL '1 hour'
+	`
+	var count int
+	err := dbConn.QueryRow(query, email, ipAddress).Scan(&count)
+	return count, err
+}
+
+// GetTimeoutDuration returns the timeout duration based on failed attempts
+func GetTimeoutDuration(failedAttempts int) time.Duration {
+	// Exponential backoff: 5min, 15min, 45min, 2h15min, etc.
+	if failedAttempts == 0 {
+		return 0
+	}
+	return time.Duration(math.Pow(3, float64(failedAttempts))) * 5 * time.Minute
+}
+
+// IsLoginBlocked checks if login is blocked for the given email/IP
+func IsLoginBlocked(email, ipAddress string) (bool, time.Duration, error) {
+	failedAttempts, err := GetFailedAttempts(email, ipAddress)
+	if err != nil {
+		return false, 0, err
+	}
+
+	if failedAttempts == 0 {
+		return false, 0, nil
+	}
+
+	timeoutDuration := GetTimeoutDuration(failedAttempts)
+
+	// Check if we're still in the timeout period
+	query := `
+		SELECT attempt_time 
+		FROM login_attempts 
+		WHERE email = $1 
+		AND ip_address = $2 
+		AND success = FALSE 
+		ORDER BY attempt_time DESC 
+		LIMIT 1
+	`
+	var lastAttempt time.Time
+	err = dbConn.QueryRow(query, email, ipAddress).Scan(&lastAttempt)
+	if err != nil {
+		return false, 0, err
+	}
+
+	timeSinceLastAttempt := time.Since(lastAttempt)
+	if timeSinceLastAttempt < timeoutDuration {
+		return true, timeoutDuration - timeSinceLastAttempt, nil
+	}
+
+	return false, 0, nil
 }

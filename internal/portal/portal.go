@@ -53,10 +53,17 @@ func loadTemplates() (map[string]*template.Template, error) {
 		// Create a new template with the base name and func map.
 		ts := template.New(name).Funcs(funcMap)
 
-		// Parse the files, always including the base layouts.
+		// Determine which base template to use
+		var baseTemplate string
+		if strings.HasPrefix(name, "admin-") {
+			baseTemplate = "admin-base.html"
+		} else {
+			baseTemplate = "base.html"
+		}
+
+		// Parse the files, using the appropriate base template
 		ts, err := ts.ParseFiles(
-			filepath.Join(templateDir, "base.html"),
-			filepath.Join(templateDir, "admin-base.html"),
+			filepath.Join(templateDir, baseTemplate),
 			filepath.Join(templateDir, page),
 		)
 		if err != nil {
@@ -172,6 +179,7 @@ func (p *Portal) Routes() http.Handler {
 		r.Use(p.adminNavMiddleware)
 
 		r.Get("/admin", p.handleAdminDashboard)
+		r.Get("/admin/dashboard", p.handleAdminDashboard)
 		r.Get("/admin/users", p.handleAdminUsers)
 		r.Post("/admin/users/{userID}/delete", p.handleAdminDeleteUser)
 		r.Post("/admin/users/{userID}/force-password-reset", p.handleAdminForcePasswordReset)
