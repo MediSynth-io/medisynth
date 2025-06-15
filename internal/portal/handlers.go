@@ -506,6 +506,7 @@ func (p *Portal) handleNewJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
+	logRequest(r, "JOBS", "Attempting to create a new generation job")
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
@@ -523,45 +524,47 @@ func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, err := json.Marshal(params)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal job params: %v", err)
+		logRequest(r, "JOBS", "Failed to marshal job params:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// Use configured internal API URL
+	// Use the configured internal API URL to call the API service
 	apiURL := p.config.APIInternalURL + "/generate-patients"
+	logRequest(r, "JOBS", "Proxying job creation request to:", apiURL)
 
 	// Create the request to the API service
 	apiReq, err := http.NewRequestWithContext(r.Context(), "POST", apiURL, bytes.NewReader(bodyBytes))
 	if err != nil {
-		log.Printf("ERROR: Failed to create API request: %v", err)
+		logRequest(r, "JOBS", "Failed to create API request:", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// Forward the user's session cookie for authentication
+	// Forward the user's session cookie for authentication with the API
 	if cookie, err := r.Cookie("session"); err == nil {
 		apiReq.AddCookie(cookie)
 	}
-
 	apiReq.Header.Set("Content-Type", "application/json")
 
 	// Execute the request
-	client := &http.Client{}
+	client := &http.Client{Timeout: 60 * time.Second}
 	apiRes, err := client.Do(apiReq)
 	if err != nil {
-		log.Printf("ERROR: Failed to call API service: %v", err)
-		http.Error(w, "Failed to start job. Could not contact API service.", http.StatusInternalServerError)
+		logRequest(r, "JOBS", "Failed to call API service:", err)
+		http.Error(w, "Failed to start job. Could not contact the data generation service.", http.StatusInternalServerError)
 		return
 	}
 	defer apiRes.Body.Close()
 
 	if apiRes.StatusCode >= 400 {
-		log.Printf("ERROR: API service returned status %d", apiRes.StatusCode)
-		http.Error(w, "Failed to create generation job.", http.StatusInternalServerError)
+		logRequest(r, "JOBS", "API service returned an error status:", apiRes.Status)
+		// Consider reading the body to pass a more specific error message to the user
+		http.Error(w, "Failed to create the data generation job. The API service responded with an error.", apiRes.StatusCode)
 		return
 	}
 
+	logRequest(r, "JOBS", "Successfully created job via API service")
 	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
 }
 
