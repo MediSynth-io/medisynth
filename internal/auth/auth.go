@@ -51,7 +51,7 @@ func ValidateUser(email, password string) (*models.User, error) {
 }
 
 // CreateToken creates a new API token for a user
-func CreateToken(userID int64, name string) (*models.Token, error) {
+func CreateToken(userID string, name string) (*models.Token, error) {
 	// Generate random token
 	tokenStr, err := generateRandomToken()
 	if err != nil {
@@ -86,12 +86,12 @@ func ValidateToken(token string) (*models.Token, error) {
 }
 
 // DeleteToken deletes an API token
-func DeleteToken(userID int64, tokenID string) error {
+func DeleteToken(userID string, tokenID string) error {
 	return dataStore.DeleteToken(userID, tokenID)
 }
 
 // ListTokens lists all tokens for a user
-func ListTokens(userID int64) ([]*models.Token, error) {
+func ListTokens(userID string) ([]*models.Token, error) {
 	return dataStore.GetUserTokens(userID)
 }
 

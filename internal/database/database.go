@@ -212,6 +212,52 @@ func GetUserTokens(userID string) ([]*models.Token, error) {
 	return tokens, nil
 }
 
+// CreateSession creates a new session for a user
+func CreateSession(userID string, token string, expiresAt time.Time) (*models.Session, error) {
+	session := &models.Session{
+		ID:        generateID(),
+		UserID:    userID,
+		Token:     token,
+		CreatedAt: time.Now(),
+		ExpiresAt: expiresAt,
+	}
+
+	_, err := dbConn.Exec(
+		"INSERT INTO sessions (id, user_id, token, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+		session.ID, session.UserID, session.Token, session.CreatedAt, session.ExpiresAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+// GetSessionByToken retrieves a session by its token
+func GetSessionByToken(token string) (*models.Session, error) {
+	session := &models.Session{}
+	err := dbConn.QueryRow(
+		"SELECT id, user_id, token, created_at, expires_at FROM sessions WHERE token = ?",
+		token,
+	).Scan(&session.ID, &session.UserID, &session.Token, &session.CreatedAt, &session.ExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
+
+// DeleteSession deletes a session
+func DeleteSession(token string) error {
+	_, err := dbConn.Exec("DELETE FROM sessions WHERE token = ?", token)
+	return err
+}
+
+// CleanupExpiredSessions deletes all expired sessions
+func CleanupExpiredSessions() error {
+	_, err := dbConn.Exec("DELETE FROM sessions WHERE expires_at < ?", time.Now())
+	return err
+}
+
 // generateID generates a unique ID
 func generateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())

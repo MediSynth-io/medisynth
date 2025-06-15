@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/models"
 )
 
 var (
@@ -14,16 +15,8 @@ var (
 	ErrSessionExpired  = errors.New("session has expired")
 )
 
-type Session struct {
-	ID        int64
-	UserID    int64
-	Token     string
-	CreatedAt time.Time
-	ExpiresAt time.Time
-}
-
 // CreateSession creates a new session for a user
-func CreateSession(userID int64) (string, error) {
+func CreateSession(userID string) (string, error) {
 	// Generate random token
 	tokenBytes := make([]byte, 32)
 	_, err := rand.Read(tokenBytes)
@@ -36,7 +29,7 @@ func CreateSession(userID int64) (string, error) {
 	expiresAt := time.Now().Add(24 * time.Hour)
 
 	// Create session in database
-	err = database.CreateSession(userID, token, expiresAt)
+	_, err = database.CreateSession(userID, token, expiresAt)
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +38,7 @@ func CreateSession(userID int64) (string, error) {
 }
 
 // ValidateSession checks if a session is valid and returns the associated user ID
-func ValidateSession(token string) (*database.Session, error) {
+func ValidateSession(token string) (*models.Session, error) {
 	session, err := database.GetSessionByToken(token)
 	if err != nil {
 		return nil, ErrSessionNotFound
