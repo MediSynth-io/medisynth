@@ -85,10 +85,32 @@
                         Password Requirements
                     </p>
                     <ul class="space-y-1">
-                        {{range .PasswordRequirements}}
                         <li class="text-sm text-gray-600 flex items-center">
                             <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full mr-2 flex-shrink-0"></span>
-                            {{.}}
+                            At least {{.PasswordRequirements.MinLength}} characters long
+                        </li>
+                        {{if .PasswordRequirements.HasUpper}}
+                        <li class="text-sm text-gray-600 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full mr-2 flex-shrink-0"></span>
+                            Contains uppercase letters (A-Z)
+                        </li>
+                        {{end}}
+                        {{if .PasswordRequirements.HasLower}}
+                        <li class="text-sm text-gray-600 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full mr-2 flex-shrink-0"></span>
+                            Contains lowercase letters (a-z)
+                        </li>
+                        {{end}}
+                        {{if .PasswordRequirements.HasNumber}}
+                        <li class="text-sm text-gray-600 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full mr-2 flex-shrink-0"></span>
+                            Contains numbers (0-9)
+                        </li>
+                        {{end}}
+                        {{if .PasswordRequirements.HasSymbol}}
+                        <li class="text-sm text-gray-600 flex items-center">
+                            <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full mr-2 flex-shrink-0"></span>
+                            Contains special characters
                         </li>
                         {{end}}
                     </ul>
