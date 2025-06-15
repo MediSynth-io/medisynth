@@ -30,12 +30,13 @@
                 <div class="hidden justify-between items-center w-full lg:flex lg:w-auto lg:order-1" id="mobile-menu-2">
                     <ul class="flex flex-col mt-4 font-medium lg:flex-row lg:space-x-8 lg:mt-0">
                         {{if .User}}
-                            <li><a href="/dashboard" class="block py-2 pr-4 pl-3 rounded lg:bg-transparent {{if eq .ActivePage "Dashboard"}}text-indigo-700{{else}}text-gray-700{{end}} lg:p-0">Dashboard</a></li>
-                            <li><a href="/tokens" class="block py-2 pr-4 pl-3 rounded lg:bg-transparent {{if eq .ActivePage "API Tokens"}}text-indigo-700{{else}}text-gray-700{{end}} lg:p-0">API Tokens</a></li>
+                            <li><a href="/dashboard" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'Dashboard' }">Dashboard</a></li>
+                            <li><a href="/tokens" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'API Tokens' }">API Tokens</a></li>
+                            <li><a href="/jobs" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'Generation History' }">Jobs</a></li>
                         {{else}}
                              <li><a href="/" class="block py-2 pr-4 pl-3 rounded lg:bg-transparent {{if eq .ActivePage "Home"}}text-indigo-700{{else}}text-gray-700{{end}} lg:p-0" aria-current="page">Home</a></li>
                         {{end}}
-                        <li><a href="/documentation" class="block py-2 pr-4 pl-3 rounded lg:bg-transparent {{if eq .ActivePage "Documentation"}}text-indigo-700{{else}}text-gray-700{{end}} lg:p-0">Documentation</a></li>
+                        <li><a href="/documentation" class="text-gray-300 hover:bg-gray-700 hover:text-white px-3 py-2 rounded-md text-sm font-medium" x-bind:class="{ 'bg-gray-900 text-white': activePage === 'Documentation' }">Documentation</a></li>
                     </ul>
                 </div>
             </div>

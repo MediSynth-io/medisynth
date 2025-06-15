@@ -309,6 +309,21 @@ func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
+func (p *Portal) handleJobs(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
+	jobs, err := database.GetJobsByUserID(userID)
+	if err != nil {
+		log.Printf("Error getting jobs for user %s: %v", userID, err)
+		http.Error(w, "Could not retrieve job history.", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Jobs": jobs,
+	}
+	p.renderTemplate(w, r, "jobs.html", "Generation History", data)
+}
+
 func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, tmplName string, pageTitle string, data interface{}) {
 	log.Printf("Rendering template: %s", tmplName)
 

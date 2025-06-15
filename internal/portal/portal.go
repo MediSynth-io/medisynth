@@ -99,6 +99,7 @@ func (p *Portal) Routes() http.Handler {
 		r.Use(p.requireAuth)
 
 		r.Get("/dashboard", p.handleDashboard)
+		r.Get("/jobs", p.handleJobs)
 
 		// Token management routes
 		r.Route("/tokens", func(r chi.Router) {
