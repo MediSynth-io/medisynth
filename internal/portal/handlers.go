@@ -359,10 +359,14 @@ func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 		auth.DeleteSession(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:    "session",
-		Value:   "",
-		Path:    "/",
-		Expires: time.Unix(0, 0),
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		Domain:   p.config.DomainPortal,
+		HttpOnly: true,
+		Secure:   p.config.DomainSecure,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  time.Unix(0, 0),
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
@@ -418,9 +422,8 @@ func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The API service is expected to be available within the cluster
-	// at a service name like 'medisynth-api' on its container port.
-	apiURL := "http://medisynth-api:8081/generate-patients"
+	// Use configured internal API URL
+	apiURL := p.config.APIInternalURL + "/generate-patients"
 
 	// Create the request to the API service
 	apiReq, err := http.NewRequestWithContext(r.Context(), "POST", apiURL, bytes.NewReader(bodyBytes))
