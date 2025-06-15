@@ -50,13 +50,11 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{.CreatedAt.Format "Jan 02, 2006 15:04 MST"}}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 {{if eq .Status "completed"}}
-                                <button type="button" class="text-indigo-600 hover:text-indigo-900" 
-                                        x-data="{}" 
-                                        @click="$dispatch('open-modal', { id: 'job-files-{{.ID}}', jobID: '{{.ID}}' })">
-                                    Details
-                                </button>
+                                    <a href="/jobs/{{.JobID}}/outputs" class="text-indigo-600 hover:text-indigo-900">View Outputs</a>
+                                {{else if eq .Status "failed"}}
+                                    <span class="text-red-500">Failed</span>
                                 {{else}}
-                                <button disabled class="text-gray-400 cursor-not-allowed">Details</button>
+                                    <span class="text-gray-500">In Progress</span>
                                 {{end}}
                                 <button type="button" class="ml-4 text-indigo-600 hover:text-indigo-900" x-data @click="$dispatch('open-modal', {id: 'hydrate-curl-{{.ID}}'})">Curl</button>
                             </td>

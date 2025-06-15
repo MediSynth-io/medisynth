@@ -80,10 +80,10 @@ func (c *Client) ListFiles(ctx context.Context, prefix string) ([]models.JobFile
 		}
 
 		files = append(files, models.JobFile{
-			S3Key:    *object.Key,
-			Filename: extractFilename(*object.Key),
-			Size:     size,
-			URL:      req.URL,
+			Name:      extractFilename(*object.Key),
+			Size:      size,
+			Timestamp: *object.LastModified,
+			URL:       req.URL,
 		})
 	}
 
@@ -109,4 +109,10 @@ func extractFilename(s3Key string) string {
 	}
 
 	return filename
+}
+
+// ListJobFiles lists all files for a specific job ID
+func (c *Client) ListJobFiles(jobID string) ([]models.JobFile, error) {
+	prefix := "synthea_output/" + jobID + "/"
+	return c.ListFiles(context.TODO(), prefix)
 }

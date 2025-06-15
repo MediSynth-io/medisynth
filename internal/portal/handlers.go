@@ -17,6 +17,7 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/bitcoin"
 	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/models"
+	"github.com/MediSynth-io/medisynth/internal/s3"
 )
 
 // getRealIP extracts the real client IP from request headers
@@ -914,5 +915,29 @@ func (p *Portal) handleAdminEditOrderForm(w http.ResponseWriter, r *http.Request
 	// For this example, we'll just render a placeholder
 	p.renderTemplate(w, r, "admin-edit-order.html", "Edit Order", map[string]interface{}{
 		"OrderID": orderID,
+	})
+}
+
+func (p *Portal) handleJobOutputs(w http.ResponseWriter, r *http.Request) {
+	jobID := chi.URLParam(r, "jobID")
+	logRequest(r, "JOBS", "Viewing outputs for job:", jobID)
+
+	s3Client, err := s3.NewClient(p.config)
+	if err != nil {
+		logRequest(r, "JOBS", "Failed to create S3 client for job", jobID, ":", err)
+		http.Error(w, "Could not access file storage.", http.StatusInternalServerError)
+		return
+	}
+
+	files, err := s3Client.ListJobFiles(jobID)
+	if err != nil {
+		logRequest(r, "JOBS", "Failed to list files for job", jobID, ":", err)
+		http.Error(w, "Could not retrieve job files.", http.StatusInternalServerError)
+		return
+	}
+
+	p.renderTemplate(w, r, "job-outputs.html", "Job Outputs", map[string]interface{}{
+		"JobID": jobID,
+		"Files": files,
 	})
 }

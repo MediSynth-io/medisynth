@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -9,14 +10,23 @@ import (
 
 // CreateJob creates a new job record
 func CreateJob(job *models.Job) error {
-	var query string
-	if dbType == "postgres" {
-		query = "INSERT INTO jobs (id, user_id, job_id, status, parameters, output_format) VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at"
-		return dbConn.QueryRow(query, job.ID, job.UserID, job.JobID, job.Status, job.ParametersJSON, job.OutputFormat).Scan(&job.CreatedAt)
+	if err := job.MarshalParameters(); err != nil {
+		return fmt.Errorf("failed to marshal job parameters: %w", err)
 	}
 
-	query = "INSERT INTO jobs (id, user_id, job_id, status, parameters, output_format, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-	_, err := dbConn.Exec(query, job.ID, job.UserID, job.JobID, job.Status, job.ParametersJSON, job.OutputFormat, job.CreatedAt)
+	query := `INSERT INTO jobs (id, user_id, job_id, status, parameters, created_at, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?)`
+	if dbType == "postgres" {
+		query = `INSERT INTO jobs (user_id, job_id, status, parameters, created_at, updated_at)
+				VALUES ($1, $2, $3, $4, $5, $6)
+				RETURNING id`
+	}
+
+	if dbType == "postgres" {
+		return dbConn.QueryRow(query, job.UserID, job.JobID, job.Status, job.ParametersJSON, job.CreatedAt, job.UpdatedAt).Scan(&job.ID)
+	}
+
+	_, err := dbConn.Exec(query, job.ID, job.UserID, job.JobID, job.Status, job.ParametersJSON, job.CreatedAt, job.UpdatedAt)
 	return err
 }
 
@@ -55,7 +65,7 @@ func GetJobByID(id string) (*models.Job, error) {
 	}
 
 	if err := job.UnmarshalParameters(); err != nil {
-		log.Printf("Warning: could not unmarshal job parameters for job %s: %v", job.ID, err)
+		log.Printf("Warning: failed to unmarshal parameters for job %s: %v", job.ID, err)
 	}
 
 	return job, nil
@@ -88,7 +98,7 @@ func GetJobsByUserID(userID string) ([]*models.Job, error) {
 		}
 
 		if err := job.UnmarshalParameters(); err != nil {
-			log.Printf("Warning: could not unmarshal job parameters for job %s: %v", job.ID, err)
+			log.Printf("Warning: could not unmarshal params for job %s: %v", job.ID, err)
 		}
 
 		jobs = append(jobs, job)

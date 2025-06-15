@@ -35,13 +35,20 @@ func New(cfg *config.Config) (*Portal, error) {
 		return nil, err
 	}
 
-	// For each page, parse it with the base template
+	// For each page, parse it with the base and helper templates
 	for _, page := range pages {
 		if page == "base.html" {
 			continue
 		}
 
-		ts, err := template.ParseFiles(
+		// Create a new template with a function map
+		funcMap := template.FuncMap{
+			"div": func(a, b float64) float64 {
+				return a / b
+			},
+		}
+
+		ts, err := template.New(page).Funcs(funcMap).ParseFiles(
 			filepath.Join(templateDir, "base.html"),
 			filepath.Join(templateDir, page),
 		)
@@ -49,6 +56,15 @@ func New(cfg *config.Config) (*Portal, error) {
 			log.Printf("Error parsing template %s: %v", page, err)
 			return nil, err
 		}
+
+		// Also parse our new helpers template if it exists
+		// This is a bit of a workaround for the way we are structuring templates
+		if _, err := os.Stat(filepath.Join(templateDir, "job-outputs.html")); err == nil {
+			if _, err := ts.ParseFiles(filepath.Join(templateDir, "job-outputs.html")); err != nil {
+				log.Printf("Error parsing helper template for %s: %v", page, err)
+			}
+		}
+
 		templates[page] = ts
 	}
 
@@ -134,6 +150,7 @@ func (p *Portal) Routes() http.Handler {
 		r.Get("/jobs", p.handleJobs)
 		r.Get("/jobs/new", p.handleNewJob)
 		r.Post("/jobs/new", p.handleCreateJob)
+		r.Get("/jobs/{jobID}/outputs", p.handleJobOutputs)
 
 		// Token management routes
 		r.Route("/tokens", func(r chi.Router) {

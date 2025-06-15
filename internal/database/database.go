@@ -483,19 +483,11 @@ func CreateUser(email, password string) (*models.User, error) {
 func GetUserByEmail(email string) (*models.User, error) {
 	user := &models.User{}
 	var err error
-
+	query := "SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE email = ?"
 	if dbType == "postgres" {
-		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE email = $1",
-			email,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
-	} else {
-		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE email = ?",
-			email,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
+		query = "SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE email = $1"
 	}
-
+	err = dbConn.QueryRow(query, email).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -506,19 +498,11 @@ func GetUserByEmail(email string) (*models.User, error) {
 func GetUserByID(id string) (*models.User, error) {
 	user := &models.User{}
 	var err error
-
+	query := "SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE id = ?"
 	if dbType == "postgres" {
-		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE id = $1",
-			id,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
-	} else {
-		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE id = ?",
-			id,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
+		query = "SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE id = $1"
 	}
-
+	err = dbConn.QueryRow(query, id).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -569,13 +553,11 @@ func GetAllUsers() ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		user := models.User{}
-		err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
-		if err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
 	}
-
 	return users, nil
 }
 
@@ -1271,23 +1253,4 @@ func UpdateOrder(order *models.Order) error {
 	}
 	_, err := dbConn.Exec(query, order.Description, order.AmountUSD, order.AmountBTC, order.Status, time.Now(), order.ID)
 	return err
-}
-
-// GetAllUsers returns all users from the database
-func GetAllUsers() ([]models.User, error) {
-	var users []models.User
-	query := "SELECT id, email, is_admin, force_password_reset, created_at, updated_at FROM users ORDER BY created_at DESC"
-	rows, err := dbConn.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var u models.User
-		if err := rows.Scan(&u.ID, &u.Email, &u.IsAdmin, &u.ForcePasswordReset, &u.CreatedAt, &u.UpdatedAt); err != nil {
-			return nil, err
-		}
-		users = append(users, u)
-	}
-	return users, nil
 }
