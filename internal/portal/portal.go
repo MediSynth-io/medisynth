@@ -80,9 +80,9 @@ func (p *Portal) Routes() http.Handler {
 			p.handleLanding(w, r)
 		}
 	})
+	r.Get("/about", p.handleAbout)
 	r.Get("/login", p.handleLoginRedirect)
 	r.Get("/register", p.handleRegisterRedirect)
-	r.Get("/documentation", p.handleDocumentation)
 	r.Post("/login", p.handleLoginRedirect)
 	r.Post("/register", p.handleRegisterRedirect)
 
@@ -99,6 +99,7 @@ func (p *Portal) Routes() http.Handler {
 		r.Use(p.requireAuth)
 
 		r.Get("/dashboard", p.handleDashboard)
+		r.Get("/documentation", p.handleDocumentation)
 		r.Get("/jobs", p.handleJobs)
 		r.Get("/jobs/new", p.handleNewJob)
 		r.Post("/jobs/new", p.handleCreateJob)

@@ -3,223 +3,522 @@
 {{define "title"}}Documentation - MediSynth Portal{{end}}
 
 {{define "content"}}
-<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-    <div class="px-4 py-6 sm:px-0">
-        <div class="border-b border-gray-200 pb-5">
-            <h1 class="text-3xl font-bold leading-tight text-gray-900">API Documentation</h1>
-            <p class="mt-2 text-sm text-gray-500">Complete guide to using the MediSynth API</p>
-        </div>
-
-        <div class="mt-8 space-y-12">
-            <!-- Authentication -->
-            <section id="authentication" class="space-y-4">
-                <h2 class="text-2xl font-bold text-gray-900">Authentication</h2>
-                <p class="text-gray-600">All API requests must be authenticated using a Bearer token.</p>
-                <div class="bg-gray-50 p-4 rounded-md">
-                    <pre class="text-sm text-gray-800">curl -H "Authorization: Bearer YOUR_API_TOKEN" https://api.medisynth.io/v1/...</pre>
-                </div>
-            </section>
-
-            <!-- Endpoints -->
-            <section id="endpoints" class="space-y-8">
-                <h2 class="text-2xl font-bold text-gray-900">Endpoints</h2>
-
-                <!-- Generate Data -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
-                            Generate Synthetic Data
-                        </h3>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                            POST /v1/generate
-                        </p>
+<div class="bg-gradient-to-br from-slate-50 to-indigo-50 min-h-screen">
+    <div class="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <!-- Header -->
+            <div class="text-center mb-12">
+                <h1 class="text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 text-transparent bg-clip-text mb-4">
+                    API Documentation
+                </h1>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Complete guide to generating synthetic medical data with the MediSynth API
+                </p>
+                <div class="mt-6 flex justify-center">
+                    <div class="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-6 py-2 rounded-full text-sm font-semibold">
+                        Base URL: https://api.medisynth.io/v1
                     </div>
-                    <div class="px-4 py-5 sm:p-6">
-                        <div class="space-y-4">
-                            <p class="text-sm text-gray-600">
-                                Generate synthetic medical data based on specified parameters.
-                            </p>
-                            <div class="space-y-2">
-                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
-                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
-  "count": 100,
-  "type": "patient",
-  "parameters": {
-    "age_range": [20, 80],
-    "conditions": ["diabetes", "hypertension"],
-    "include_medications": true
-  }
-}</pre>
+                </div>
+            </div>
+
+            <!-- Quick Navigation -->
+            <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 mb-12">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6 text-center">Quick Navigation</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <a href="#authentication" class="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-3 rounded-xl text-center font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all duration-200">
+                        Authentication
+                    </a>
+                    <a href="#generate-patients" class="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-3 rounded-xl text-center font-semibold hover:from-purple-600 hover:to-pink-600 transition-all duration-200">
+                        Generate Patients
+                    </a>
+                    <a href="#advanced-options" class="bg-gradient-to-r from-green-500 to-teal-500 text-white px-4 py-3 rounded-xl text-center font-semibold hover:from-green-600 hover:to-teal-600 transition-all duration-200">
+                        Advanced Options
+                    </a>
+                    <a href="#examples" class="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-3 rounded-xl text-center font-semibold hover:from-orange-600 hover:to-red-600 transition-all duration-200">
+                        Examples
+                    </a>
+                </div>
+            </div>
+
+            <div class="space-y-16">
+                <!-- Authentication -->
+                <section id="authentication" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-6">
+                        <h2 class="text-3xl font-bold text-white">Authentication</h2>
+                        <p class="text-indigo-100 mt-2">Secure your API requests with Bearer tokens</p>
+                    </div>
+                    <div class="p-8">
+                        <p class="text-gray-700 text-lg mb-6">All API requests must include a valid Bearer token in the Authorization header.</p>
+                        
+                        <div class="space-y-6">
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 mb-3">Using cURL</h4>
+                                <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                    <pre class="text-green-400 text-sm font-mono">curl -X POST "https://api.medisynth.io/v1/generate-patients" \
+  -H "Authorization: Bearer YOUR_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "population": 100,
+    "state": "California"
+  }'</pre>
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
-                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
-  "data": [{
-    "id": "p_123",
-    "age": 45,
-    "conditions": ["diabetes"],
-    "medications": [{
-      "name": "Metformin",
-      "dosage": "500mg"
-    }]
-  }, ...]
+                            
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 mb-3">Using JavaScript</h4>
+                                <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                    <pre class="text-blue-400 text-sm font-mono">const response = await fetch('https://api.medisynth.io/v1/generate-patients', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    population: 100,
+    state: 'California'
+  })
+});
+
+const data = await response.json();</pre>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <h4 class="text-lg font-semibold text-gray-900 mb-3">Using Python</h4>
+                                <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                    <pre class="text-yellow-400 text-sm font-mono">import requests
+
+headers = {
+    'Authorization': 'Bearer YOUR_API_TOKEN',
+    'Content-Type': 'application/json'
+}
+
+data = {
+    'population': 100,
+    'state': 'California'
+}
+
+response = requests.post(
+    'https://api.medisynth.io/v1/generate-patients',
+    headers=headers,
+    json=data
+)</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Generate Patients -->
+                <section id="generate-patients" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-purple-600 to-pink-600 px-8 py-6">
+                        <h2 class="text-3xl font-bold text-white">Generate Patients</h2>
+                        <p class="text-purple-100 mt-2">POST /v1/generate-patients</p>
+                    </div>
+                    <div class="p-8">
+                        <p class="text-gray-700 text-lg mb-6">Generate realistic synthetic patient data with comprehensive medical histories.</p>
+                        
+                        <!-- Basic Parameters -->
+                        <div class="mb-8">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Basic Parameters</h3>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <div>
+                                    <h4 class="text-lg font-semibold text-gray-900 mb-3">Simple Request</h4>
+                                    <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                        <pre class="text-green-400 text-sm font-mono">{
+  "population": 1000,
+  "state": "California",
+  "city": "San Francisco"
+}</pre>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-semibold text-gray-900 mb-3">With Demographics</h4>
+                                    <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                        <pre class="text-blue-400 text-sm font-mono">{
+  "population": 500,
+  "gender": "F",
+  "ageMin": 25,
+  "ageMax": 65,
+  "state": "New York"
+}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Parameter Reference -->
+                        <div class="mb-8">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Parameter Reference</h3>
+                            <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <h4 class="font-semibold text-gray-900 mb-3">Core Parameters</h4>
+                                        <ul class="space-y-2 text-sm">
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">population</code> - Number of patients (1-10000)</li>
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">seed</code> - Random seed for reproducible results</li>
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">outputFormat</code> - "fhir", "ccda", "csv" (default: "fhir")</li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 class="font-semibold text-gray-900 mb-3">Demographics</h4>
+                                        <ul class="space-y-2 text-sm">
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">gender</code> - "M", "F", or null for mixed</li>
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">ageMin</code> - Minimum age (0-120)</li>
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">ageMax</code> - Maximum age (0-120)</li>
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">state</code> - US state name or abbreviation</li>
+                                            <li><code class="bg-gray-200 px-2 py-1 rounded">city</code> - City name within state</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Response Format -->
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Response Format</h3>
+                            <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                <pre class="text-yellow-400 text-sm font-mono">{
+  "status": "success",
+  "jobId": "job_abc123def456",
+  "message": "Generation job started successfully",
+  "estimatedCompletionTime": "2024-01-15T10:30:00Z",
+  "downloadUrl": "https://api.medisynth.io/v1/jobs/job_abc123def456/download",
+  "webhookUrl": "https://your-app.com/webhook" // if provided
 }</pre>
                             </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <!-- Validate Data -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
-                            Validate Data
-                        </h3>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                            POST /v1/validate
-                        </p>
+                <!-- Advanced Options -->
+                <section id="advanced-options" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-green-600 to-teal-600 px-8 py-6">
+                        <h2 class="text-3xl font-bold text-white">Advanced Options</h2>
+                        <p class="text-green-100 mt-2">Powerful features for complex scenarios</p>
                     </div>
-                    <div class="px-4 py-5 sm:p-6">
-                        <div class="space-y-4">
-                            <p class="text-sm text-gray-600">
-                                Validate medical data against known patterns and rules.
-                            </p>
-                            <div class="space-y-2">
-                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
-                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
-  "data": [{
-    "id": "p_123",
-    "age": 45,
-    "conditions": ["diabetes"],
-    "medications": [{
-      "name": "Metformin",
-      "dosage": "500mg"
-    }]
+                    <div class="p-8">
+                        <!-- Custom Modules -->
+                        <div class="mb-8">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Custom Synthea Modules</h3>
+                            <p class="text-gray-700 mb-4">Import your own Synthea modules to generate specific medical scenarios and conditions.</p>
+                            <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                <pre class="text-purple-400 text-sm font-mono">{
+  "population": 500,
+  "customModules": [
+    "https://your-domain.com/modules/covid-variants.json",
+    "https://your-domain.com/modules/rare-diseases.json"
+  ],
+  "state": "Texas",
+  "ageMin": 18,
+  "ageMax": 85
+}</pre>
+                            </div>
+                        </div>
+
+                        <!-- Condition Targeting -->
+                        <div class="mb-8">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Target Specific Conditions</h3>
+                            <p class="text-gray-700 mb-4">Generate patients with specific medical conditions using SNOMED-CT codes.</p>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 class="text-lg font-semibold text-gray-900 mb-3">Single Condition</h4>
+                                    <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                        <pre class="text-blue-400 text-sm font-mono">{
+  "population": 200,
+  "keepActiveConditions": [{
+    "system": "SNOMED-CT",
+    "code": "44054006",
+    "display": "Type 2 diabetes mellitus"
   }]
 }</pre>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-semibold text-gray-900 mb-3">Multiple Conditions</h4>
+                                    <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                        <pre class="text-orange-400 text-sm font-mono">{
+  "population": 300,
+  "keepActiveConditions": [{
+    "system": "SNOMED-CT",
+    "code": "38341003",
+    "display": "Hypertension"
+  }, {
+    "system": "SNOMED-CT", 
+    "code": "13644009",
+    "display": "Hypercholesterolemia"
+  }],
+  "keepLogic": "AND"
+}</pre>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
-                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
-  "valid": true,
-  "errors": [],
-  "warnings": [{
-    "field": "medications[0].dosage",
-    "message": "Consider specifying frequency"
-  }]
+                        </div>
+
+                        <!-- Output Formats -->
+                        <div class="mb-8">
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Output Formats</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                    <h4 class="font-bold text-gray-900 mb-3">FHIR (Default)</h4>
+                                    <p class="text-sm text-gray-600 mb-3">Industry-standard healthcare data format</p>
+                                    <div class="bg-gray-900 rounded-lg p-3">
+                                        <pre class="text-green-400 text-xs font-mono">{
+  "outputFormat": "fhir"
+}</pre>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                    <h4 class="font-bold text-gray-900 mb-3">CCDA</h4>
+                                    <p class="text-sm text-gray-600 mb-3">Clinical Document Architecture</p>
+                                    <div class="bg-gray-900 rounded-lg p-3">
+                                        <pre class="text-blue-400 text-xs font-mono">{
+  "outputFormat": "ccda"
+}</pre>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                    <h4 class="font-bold text-gray-900 mb-3">CSV</h4>
+                                    <p class="text-sm text-gray-600 mb-3">Tabular data for analysis</p>
+                                    <div class="bg-gray-900 rounded-lg p-3">
+                                        <pre class="text-yellow-400 text-xs font-mono">{
+  "outputFormat": "csv"
+}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Webhooks -->
+                        <div>
+                            <h3 class="text-2xl font-bold text-gray-900 mb-4">Webhook Notifications</h3>
+                            <p class="text-gray-700 mb-4">Get notified when your generation job completes.</p>
+                            <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                <pre class="text-pink-400 text-sm font-mono">{
+  "population": 1000,
+  "state": "California",
+  "webhookUrl": "https://your-app.com/webhook/medisynth",
+  "webhookSecret": "your-secret-key-here"
 }</pre>
                             </div>
                         </div>
-                    </div>
-                </div>
+                                        </div>
+                </section>
 
-                <!-- Export Data -->
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
-                        <h3 class="text-lg leading-6 font-medium text-gray-900">
-                            Export Data
-                        </h3>
-                        <p class="mt-1 max-w-2xl text-sm text-gray-500">
-                            POST /v1/export
-                        </p>
+                <!-- Comprehensive Examples -->
+                <section id="examples" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-orange-600 to-red-600 px-8 py-6">
+                        <h2 class="text-3xl font-bold text-white">Real-World Examples</h2>
+                        <p class="text-orange-100 mt-2">Complete scenarios you can copy and use</p>
                     </div>
-                    <div class="px-4 py-5 sm:p-6">
-                        <div class="space-y-4">
-                            <p class="text-sm text-gray-600">
-                                Export generated data in various formats.
-                            </p>
-                            <div class="space-y-2">
-                                <h4 class="text-sm font-medium text-gray-900">Request Body</h4>
-                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
-  "format": "csv",
-  "data_ids": ["p_123", "p_124"],
-  "fields": ["id", "age", "conditions"]
+                    <div class="p-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <!-- Healthcare Research -->
+                            <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                <h3 class="text-xl font-bold text-gray-900 mb-3">Healthcare Research Study</h3>
+                                <p class="text-gray-600 mb-4">Generate elderly patients with diabetes for clinical research</p>
+                                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                                    <pre class="text-cyan-400 text-sm font-mono">{
+  "population": 2500,
+  "ageMin": 65,
+  "ageMax": 90,
+  "keepActiveConditions": [{
+    "system": "SNOMED-CT",
+    "code": "44054006",
+    "display": "Type 2 diabetes"
+  }],
+  "state": "Florida",
+  "outputFormat": "fhir",
+  "seed": 12345
 }</pre>
+                                </div>
                             </div>
-                            <div class="space-y-2">
-                                <h4 class="text-sm font-medium text-gray-900">Response</h4>
-                                <p class="text-sm text-gray-600">Returns a file in the requested format.</p>
+
+                            <!-- EMR Testing -->
+                            <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                <h3 class="text-xl font-bold text-gray-900 mb-3">EMR System Testing</h3>
+                                <p class="text-gray-600 mb-4">Diverse patient population for testing electronic medical records</p>
+                                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                                    <pre class="text-emerald-400 text-sm font-mono">{
+  "population": 5000,
+  "ageMin": 18,
+  "ageMax": 80,
+  "state": "California",
+  "city": "Los Angeles",
+  "outputFormat": "ccda",
+  "webhookUrl": "https://your-emr.com/webhook"
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Machine Learning -->
+                            <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                <h3 class="text-xl font-bold text-gray-900 mb-3">ML Training Dataset</h3>
+                                <p class="text-gray-600 mb-4">Large dataset for training machine learning models</p>
+                                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                                    <pre class="text-violet-400 text-sm font-mono">{
+  "population": 10000,
+  "keepActiveConditions": [{
+    "system": "SNOMED-CT",
+    "code": "38341003",
+    "display": "Hypertension"
+  }, {
+    "system": "SNOMED-CT",
+    "code": "13644009", 
+    "display": "Hypercholesterolemia"
+  }],
+  "keepLogic": "OR",
+  "outputFormat": "csv"
+}</pre>
+                                </div>
+                            </div>
+
+                            <!-- Pediatric Study -->
+                            <div class="bg-slate-50 rounded-xl p-6 border-2 border-slate-200">
+                                <h3 class="text-xl font-bold text-gray-900 mb-3">Pediatric Population</h3>
+                                <p class="text-gray-600 mb-4">Children and adolescents for pediatric research</p>
+                                <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto">
+                                    <pre class="text-pink-400 text-sm font-mono">{
+  "population": 1000,
+  "ageMin": 0,
+  "ageMax": 17,
+  "state": "New York",
+  "customModules": [
+    "https://modules.example.com/pediatric-vaccines.json"
+  ],
+  "outputFormat": "fhir"
+}</pre>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- Error Handling -->
-            <section id="errors" class="space-y-4">
-                <h2 class="text-2xl font-bold text-gray-900">Error Handling</h2>
-                <p class="text-gray-600">The API uses conventional HTTP response codes to indicate success or failure.</p>
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 sm:p-6">
-                        <div class="space-y-4">
-                            <ul class="list-disc list-inside text-sm text-gray-600">
-                                <li><span class="font-medium">200</span> - Success</li>
-                                <li><span class="font-medium">400</span> - Bad Request (invalid parameters)</li>
-                                <li><span class="font-medium">401</span> - Unauthorized (invalid token)</li>
-                                <li><span class="font-medium">403</span> - Forbidden (insufficient permissions)</li>
-                                <li><span class="font-medium">404</span> - Not Found</li>
-                                <li><span class="font-medium">429</span> - Too Many Requests</li>
-                                <li><span class="font-medium">500</span> - Internal Server Error</li>
-                            </ul>
-                            <div class="mt-4">
-                                <h4 class="text-sm font-medium text-gray-900">Error Response Format</h4>
-                                <pre class="bg-gray-50 p-4 rounded-md text-sm text-gray-800">{
+                <!-- Error Handling -->
+                <section id="errors" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-red-600 to-pink-600 px-8 py-6">
+                        <h2 class="text-3xl font-bold text-white">Error Handling</h2>
+                        <p class="text-red-100 mt-2">Understanding API responses and troubleshooting</p>
+                    </div>
+                    <div class="p-8">
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-900 mb-4">HTTP Status Codes</h3>
+                                <div class="space-y-3">
+                                    <div class="flex items-center bg-green-50 border border-green-200 rounded-lg p-3">
+                                        <span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold mr-3">200</span>
+                                        <span class="text-green-800">Success - Job created successfully</span>
+                                    </div>
+                                    <div class="flex items-center bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                                        <span class="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-bold mr-3">400</span>
+                                        <span class="text-yellow-800">Bad Request - Invalid parameters</span>
+                                    </div>
+                                    <div class="flex items-center bg-red-50 border border-red-200 rounded-lg p-3">
+                                        <span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold mr-3">401</span>
+                                        <span class="text-red-800">Unauthorized - Invalid API token</span>
+                                    </div>
+                                    <div class="flex items-center bg-purple-50 border border-purple-200 rounded-lg p-3">
+                                        <span class="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold mr-3">429</span>
+                                        <span class="text-purple-800">Rate Limited - Too many requests</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-2xl font-bold text-gray-900 mb-4">Error Response Format</h3>
+                                <div class="bg-gray-900 rounded-xl p-6 overflow-x-auto">
+                                    <pre class="text-red-400 text-sm font-mono">{
   "error": {
     "code": "invalid_parameters",
     "message": "Invalid age range specified",
     "details": {
-      "field": "parameters.age_range",
-      "reason": "Maximum age must be less than 120"
-    }
+      "field": "ageMax",
+      "reason": "Maximum age cannot exceed 120",
+      "provided": 150,
+      "allowed": "0-120"
+    },
+    "requestId": "req_abc123def456"
   }
 }</pre>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- Rate Limiting -->
-            <section id="rate-limiting" class="space-y-4">
-                <h2 class="text-2xl font-bold text-gray-900">Rate Limiting</h2>
-                <p class="text-gray-600">API requests are rate limited based on your subscription tier.</p>
-                <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-                    <div class="px-4 py-5 sm:p-6">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead>
-                                <tr>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Tier
-                                    </th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Rate Limit
-                                    </th>
-                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Burst Limit
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Free</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">100/hour</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">200</td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Pro</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1000/hour</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2000</td>
-                                </tr>
-                                <tr>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">Enterprise</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Custom</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Custom</td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <!-- Rate Limiting -->
+                <section id="rate-limiting" class="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-6">
+                        <h2 class="text-3xl font-bold text-white">Rate Limits & Pricing</h2>
+                        <p class="text-indigo-100 mt-2">Usage limits and subscription tiers</p>
                     </div>
-                </div>
-            </section>
+                    <div class="p-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-200">
+                                <div class="text-center">
+                                    <h3 class="text-2xl font-bold text-gray-900 mb-2">Free Tier</h3>
+                                    <div class="text-3xl font-bold text-gray-600 mb-4">$0</div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span>Requests/hour:</span>
+                                            <span class="font-semibold">100</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Patients/month:</span>
+                                            <span class="font-semibold">10,000</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Formats:</span>
+                                            <span class="font-semibold">All</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 border-2 border-indigo-200 transform scale-105">
+                                <div class="text-center">
+                                    <h3 class="text-2xl font-bold text-indigo-900 mb-2">Pro</h3>
+                                    <div class="text-3xl font-bold text-indigo-600 mb-4">$49<span class="text-sm font-normal">/mo</span></div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span>Requests/hour:</span>
+                                            <span class="font-semibold">1,000</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Patients/month:</span>
+                                            <span class="font-semibold">100,000</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Webhooks:</span>
+                                            <span class="font-semibold">✓</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 border-2 border-purple-200">
+                                <div class="text-center">
+                                    <h3 class="text-2xl font-bold text-purple-900 mb-2">Enterprise</h3>
+                                    <div class="text-3xl font-bold text-purple-600 mb-4">Custom</div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span>Requests/hour:</span>
+                                            <span class="font-semibold">Unlimited</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Patients/month:</span>
+                                            <span class="font-semibold">Unlimited</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span>Custom modules:</span>
+                                            <span class="font-semibold">✓</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
         </div>
     </div>
 </div>
