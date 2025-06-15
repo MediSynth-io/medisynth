@@ -3,6 +3,7 @@ package portal
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -10,10 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/MediSynth-io/medisynth/internal/auth"
+	"github.com/MediSynth-io/medisynth/internal/bitcoin"
 	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/models"
-	"github.com/go-chi/chi/v5"
 )
 
 func (p *Portal) handleLanding(w http.ResponseWriter, r *http.Request) {
@@ -562,6 +565,214 @@ func getMapKeys(m map[string]interface{}) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// ============================================================================
+// ADMIN HANDLERS
+// ============================================================================
+
+func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[ADMIN] Rendering admin dashboard")
+
+	// Get admin statistics
+	totalUsers, _ := database.GetUserCount()
+	totalOrders, _ := database.GetOrderCount()
+	totalRevenue, _ := database.GetTotalRevenue()
+	recentOrders, _ := database.GetRecentOrders(10)
+
+	data := map[string]interface{}{
+		"TotalUsers":   totalUsers,
+		"TotalOrders":  totalOrders,
+		"TotalRevenue": totalRevenue,
+		"RecentOrders": recentOrders,
+	}
+
+	p.renderTemplate(w, r, "admin-dashboard.html", "Admin Dashboard", data)
+}
+
+func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[ADMIN] Rendering admin users page")
+
+	users, err := database.GetAllUsers()
+	if err != nil {
+		log.Printf("[ADMIN] Error getting users: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Users": users,
+	}
+
+	p.renderTemplate(w, r, "admin-users.html", "Admin Users", data)
+}
+
+func (p *Portal) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[ADMIN] Rendering admin orders page")
+
+	orders, err := database.GetAllOrders()
+	if err != nil {
+		log.Printf("[ADMIN] Error getting orders: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Orders": orders,
+	}
+
+	p.renderTemplate(w, r, "admin-orders.html", "Admin Orders", data)
+}
+
+func (p *Portal) handleAdminPayments(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[ADMIN] Rendering admin payments page")
+
+	payments, err := database.GetAllPayments()
+	if err != nil {
+		log.Printf("[ADMIN] Error getting payments: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Payments": payments,
+	}
+
+	p.renderTemplate(w, r, "admin-payments.html", "Admin Payments", data)
+}
+
+func (p *Portal) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[ADMIN] Creating new order")
+
+	// Parse form data
+	userID := r.FormValue("user_id")
+	description := r.FormValue("description")
+	amountUSD := r.FormValue("amount_usd")
+
+	if userID == "" || description == "" || amountUSD == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	amount, err := strconv.ParseFloat(amountUSD, 64)
+	if err != nil {
+		http.Error(w, "Invalid amount", http.StatusBadRequest)
+		return
+	}
+
+	// Use Bitcoin service to process the order with payment setup
+	bitcoinService := bitcoin.NewBitcoinService()
+	order, err := bitcoinService.ProcessOrderPayment(userID, description, amount, p.config.BitcoinAddress)
+	if err != nil {
+		log.Printf("[ADMIN] Error creating order: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[ADMIN] Created order %s for user %s", order.OrderNumber, userID)
+	http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)
+}
+
+// ============================================================================
+// USER ORDER HANDLERS
+// ============================================================================
+
+func (p *Portal) handleUserOrders(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	log.Printf("[ORDERS] Rendering orders for user: %s", userID)
+
+	orders, err := database.GetUserOrders(userID)
+	if err != nil {
+		log.Printf("[ORDERS] Error getting orders for user %s: %v", userID, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Orders": orders,
+	}
+
+	p.renderTemplate(w, r, "orders.html", "My Orders", data)
+}
+
+func (p *Portal) handleOrderDetails(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	orderID := chi.URLParam(r, "id")
+	if orderID == "" {
+		http.Error(w, "Order ID required", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("[ORDERS] Getting order details for order %s, user %s", orderID, userID)
+
+	order, err := database.GetOrderByID(orderID, userID)
+	if err != nil {
+		log.Printf("[ORDERS] Error getting order %s: %v", orderID, err)
+		if err == sql.ErrNoRows {
+			http.Error(w, "Order not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	data := map[string]interface{}{
+		"Order": order,
+	}
+
+	p.renderTemplate(w, r, "order-details.html", "Order Details", data)
+}
+
+func (p *Portal) handleCreateUserOrder(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value("userID").(string)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	log.Printf("[ORDERS] Creating new order for user: %s", userID)
+
+	// Parse form data
+	description := r.FormValue("description")
+	amountUSD := r.FormValue("amount_usd")
+
+	if description == "" || amountUSD == "" {
+		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	amount, err := strconv.ParseFloat(amountUSD, 64)
+	if err != nil {
+		http.Error(w, "Invalid amount", http.StatusBadRequest)
+		return
+	}
+
+	// Use Bitcoin service to process the order with payment setup
+	bitcoinService := bitcoin.NewBitcoinService()
+	order, err := bitcoinService.ProcessOrderPayment(userID, description, amount, p.config.BitcoinAddress)
+	if err != nil {
+		log.Printf("[ORDERS] Error creating order: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("[ORDERS] Created order %s for user %s", order.OrderNumber, userID)
+	http.Redirect(w, r, "/orders/"+order.ID, http.StatusSeeOther)
+}
+
+func (p *Portal) handleCreateOrderForm(w http.ResponseWriter, r *http.Request) {
+	log.Printf("[ORDERS] Showing order creation form")
+	p.renderTemplate(w, r, "create-order.html", "Create Order", nil)
 }
 
 // responseWriter is a wrapper around http.ResponseWriter that includes the request context

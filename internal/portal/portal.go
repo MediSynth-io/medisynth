@@ -121,15 +121,27 @@ func (p *Portal) Routes() http.Handler {
 		})
 	})
 
-	// Admin routes (TODO: implement handlers)
-	// r.Group(func(r chi.Router) {
-	// 	r.Use(p.requireAuth)
-	// 	r.Use(p.requireAdmin)
-	// 	r.Get("/admin", p.handleAdminDashboard)
-	// 	r.Get("/admin/users", p.handleAdminUsers)
-	// 	r.Get("/admin/bitcoin", p.handleBitcoinPayments)
-	// 	r.Post("/admin/bitcoin/generate-qr", p.handleGeneratePaymentQR)
-	// })
+	// Admin routes
+	r.Group(func(r chi.Router) {
+		r.Use(p.requireAuth)
+		r.Use(p.requireAdmin)
+
+		r.Get("/admin", p.handleAdminDashboard)
+		r.Get("/admin/users", p.handleAdminUsers)
+		r.Get("/admin/orders", p.handleAdminOrders)
+		r.Get("/admin/payments", p.handleAdminPayments)
+		r.Post("/admin/orders/create", p.handleCreateOrder)
+	})
+
+	// User order routes
+	r.Group(func(r chi.Router) {
+		r.Use(p.requireAuth)
+
+		r.Get("/orders", p.handleUserOrders)
+		r.Get("/orders/create", p.handleCreateOrderForm)
+		r.Get("/orders/{id}", p.handleOrderDetails)
+		r.Post("/orders/create", p.handleCreateUserOrder)
+	})
 
 	// NotFound handler
 	r.NotFound(func(w http.ResponseWriter, r *http.Request) {

@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/MediSynth-io/medisynth/internal/auth"
+	"github.com/MediSynth-io/medisynth/internal/bitcoin"
 	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/portal"
@@ -26,6 +28,17 @@ func initializePortal() (http.Handler, error) {
 	// Initialize database
 	if err := database.Init(cfg); err != nil {
 		return nil, err
+	}
+
+	// Initialize Bitcoin monitoring
+	if cfg.BitcoinAddress != "" {
+		log.Printf("Initializing Bitcoin payment monitoring for address: %s", cfg.BitcoinAddress)
+		bitcoinService := bitcoin.NewBitcoinService()
+		// Check every 2 minutes for payments
+		bitcoinService.StartMonitoring(cfg.BitcoinAddress, 2*time.Minute)
+		log.Printf("Bitcoin payment monitoring started successfully")
+	} else {
+		log.Printf("No Bitcoin address configured, skipping payment monitoring")
 	}
 
 	// Initialize store

@@ -214,6 +214,34 @@ func initSchema(db *sql.DB, dbType string) error {
 				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
 				completed_at TIMESTAMP WITH TIME ZONE
 			)`,
+			`CREATE TABLE IF NOT EXISTS orders (
+				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+				user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				order_number VARCHAR(50) NOT NULL UNIQUE,
+				description TEXT NOT NULL,
+				amount_usd DECIMAL(10,2) NOT NULL,
+				amount_btc DECIMAL(16,8),
+				btc_address VARCHAR(255) NOT NULL,
+				qr_code_data TEXT,
+				status VARCHAR(50) NOT NULL DEFAULT 'pending',
+				payment_received_at TIMESTAMP WITH TIME ZONE,
+				transaction_hash VARCHAR(255),
+				confirmations INTEGER DEFAULT 0,
+				expires_at TIMESTAMP WITH TIME ZONE,
+				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+				updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+			)`,
+			`CREATE TABLE IF NOT EXISTS payments (
+				id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+				order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+				transaction_hash VARCHAR(255) NOT NULL,
+				amount_btc DECIMAL(16,8) NOT NULL,
+				confirmations INTEGER NOT NULL DEFAULT 0,
+				status VARCHAR(50) NOT NULL DEFAULT 'pending',
+				detected_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+				confirmed_at TIMESTAMP WITH TIME ZONE,
+				created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+			)`,
 			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_token ON tokens(token)`,
@@ -222,6 +250,11 @@ func initSchema(db *sql.DB, dbType string) error {
 			`CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)`,
 			`CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)`,
+			`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`,
+			`CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)`,
+			`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_payments_transaction_hash ON payments(transaction_hash)`,
 		}
 	} else {
 		// SQLite schema (original)
@@ -266,10 +299,47 @@ func initSchema(db *sql.DB, dbType string) error {
 				completed_at DATETIME,
 				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 			)`,
+			`CREATE TABLE IF NOT EXISTS orders (
+				id TEXT PRIMARY KEY,
+				user_id TEXT NOT NULL,
+				order_number TEXT NOT NULL UNIQUE,
+				description TEXT NOT NULL,
+				amount_usd REAL NOT NULL,
+				amount_btc REAL,
+				btc_address TEXT NOT NULL,
+				qr_code_data TEXT,
+				status TEXT NOT NULL DEFAULT 'pending',
+				payment_received_at DATETIME,
+				transaction_hash TEXT,
+				confirmations INTEGER DEFAULT 0,
+				expires_at DATETIME,
+				created_at DATETIME NOT NULL,
+				updated_at DATETIME NOT NULL,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+			)`,
+			`CREATE TABLE IF NOT EXISTS payments (
+				id TEXT PRIMARY KEY,
+				order_id TEXT NOT NULL,
+				transaction_hash TEXT NOT NULL,
+				amount_btc REAL NOT NULL,
+				confirmations INTEGER NOT NULL DEFAULT 0,
+				status TEXT NOT NULL DEFAULT 'pending',
+				detected_at DATETIME NOT NULL,
+				confirmed_at DATETIME,
+				created_at DATETIME NOT NULL,
+				FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+			)`,
 			`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`,
 			`CREATE INDEX IF NOT EXISTS idx_tokens_user_id ON tokens(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id)`,
 			`CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token)`,
+			`CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)`,
+			`CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`,
+			`CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number)`,
+			`CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id)`,
+			`CREATE INDEX IF NOT EXISTS idx_payments_transaction_hash ON payments(transaction_hash)`,
 		}
 	}
 
@@ -721,6 +791,422 @@ func CleanupExpiredSessions() error {
 // GenerateID generates a unique ID for SQLite, not needed for PostgreSQL
 func GenerateID() string {
 	return fmt.Sprintf("%d", time.Now().UnixNano())
+}
+
+// ============================================================================
+// ORDER & PAYMENT FUNCTIONS
+// ============================================================================
+
+// GetUserCount returns the total number of users
+func GetUserCount() (int, error) {
+	var count int
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT COUNT(*) FROM users"
+	} else {
+		query = "SELECT COUNT(*) FROM users"
+	}
+	err := dbConn.QueryRow(query).Scan(&count)
+	return count, err
+}
+
+// GetOrderCount returns the total number of orders
+func GetOrderCount() (int, error) {
+	var count int
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT COUNT(*) FROM orders"
+	} else {
+		query = "SELECT COUNT(*) FROM orders"
+	}
+	err := dbConn.QueryRow(query).Scan(&count)
+	return count, err
+}
+
+// GetTotalRevenue returns the total revenue from confirmed orders
+func GetTotalRevenue() (float64, error) {
+	var revenue float64
+	var query string
+	if dbType == "postgres" {
+		query = "SELECT COALESCE(SUM(amount_usd), 0) FROM orders WHERE status = 'confirmed'"
+	} else {
+		query = "SELECT COALESCE(SUM(amount_usd), 0) FROM orders WHERE status = 'confirmed'"
+	}
+	err := dbConn.QueryRow(query).Scan(&revenue)
+	return revenue, err
+}
+
+// GetRecentOrders returns the most recent orders
+func GetRecentOrders(limit int) ([]*models.Order, error) {
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, status, confirmations, created_at, updated_at 
+				FROM orders ORDER BY created_at DESC LIMIT $1`
+	} else {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, status, confirmations, created_at, updated_at 
+				FROM orders ORDER BY created_at DESC LIMIT ?`
+	}
+
+	rows, err := dbConn.Query(query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		order := &models.Order{}
+		err := rows.Scan(&order.ID, &order.UserID, &order.OrderNumber, &order.Description,
+			&order.AmountUSD, &order.AmountBTC, &order.BTCAddress, &order.Status,
+			&order.Confirmations, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+}
+
+// GetAllOrders returns all orders
+func GetAllOrders() ([]*models.Order, error) {
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, status, confirmations, created_at, updated_at 
+				FROM orders ORDER BY created_at DESC`
+	} else {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, status, confirmations, created_at, updated_at 
+				FROM orders ORDER BY created_at DESC`
+	}
+
+	rows, err := dbConn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		order := &models.Order{}
+		err := rows.Scan(&order.ID, &order.UserID, &order.OrderNumber, &order.Description,
+			&order.AmountUSD, &order.AmountBTC, &order.BTCAddress, &order.Status,
+			&order.Confirmations, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+}
+
+// GetAllPayments returns all payments
+func GetAllPayments() ([]*models.Payment, error) {
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, order_id, transaction_hash, amount_btc, confirmations, 
+				status, detected_at, created_at FROM payments ORDER BY detected_at DESC`
+	} else {
+		query = `SELECT id, order_id, transaction_hash, amount_btc, confirmations, 
+				status, detected_at, created_at FROM payments ORDER BY detected_at DESC`
+	}
+
+	rows, err := dbConn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var payments []*models.Payment
+	for rows.Next() {
+		payment := &models.Payment{}
+		err := rows.Scan(&payment.ID, &payment.OrderID, &payment.TransactionHash,
+			&payment.AmountBTC, &payment.Confirmations, &payment.Status,
+			&payment.DetectedAt, &payment.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		payments = append(payments, payment)
+	}
+
+	return payments, nil
+}
+
+// CreateOrder creates a new order
+func CreateOrder(userID, description string, amountUSD float64, btcAddress string) (*models.Order, error) {
+	order := &models.Order{
+		UserID:      userID,
+		Description: description,
+		AmountUSD:   amountUSD,
+		BTCAddress:  btcAddress,
+		Status:      models.OrderStatusPending,
+	}
+
+	// Generate order number
+	order.OrderNumber = fmt.Sprintf("ORD-%d", time.Now().Unix())
+
+	// Set expiration (24 hours from now)
+	expiresAt := time.Now().Add(24 * time.Hour)
+	order.ExpiresAt = &expiresAt
+
+	if dbType == "postgres" {
+		err := dbConn.QueryRow(`
+			INSERT INTO orders (user_id, order_number, description, amount_usd, btc_address, expires_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING id, created_at, updated_at`,
+			order.UserID, order.OrderNumber, order.Description, order.AmountUSD,
+			order.BTCAddress, order.ExpiresAt,
+		).Scan(&order.ID, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		order.ID = GenerateID()
+		order.CreatedAt = time.Now()
+		order.UpdatedAt = time.Now()
+
+		_, err := dbConn.Exec(`
+			INSERT INTO orders (id, user_id, order_number, description, amount_usd, btc_address, expires_at, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			order.ID, order.UserID, order.OrderNumber, order.Description, order.AmountUSD,
+			order.BTCAddress, order.ExpiresAt, order.CreatedAt, order.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return order, nil
+}
+
+// GetUserOrders returns all orders for a specific user
+func GetUserOrders(userID string) ([]*models.Order, error) {
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, status, confirmations, created_at, updated_at 
+				FROM orders WHERE user_id = $1 ORDER BY created_at DESC`
+	} else {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, status, confirmations, created_at, updated_at 
+				FROM orders WHERE user_id = ? ORDER BY created_at DESC`
+	}
+
+	rows, err := dbConn.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		order := &models.Order{}
+		err := rows.Scan(&order.ID, &order.UserID, &order.OrderNumber, &order.Description,
+			&order.AmountUSD, &order.AmountBTC, &order.BTCAddress, &order.Status,
+			&order.Confirmations, &order.CreatedAt, &order.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+}
+
+// GetOrderByID returns an order by ID for a specific user
+func GetOrderByID(orderID, userID string) (*models.Order, error) {
+	order := &models.Order{}
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, qr_code_data, status, confirmations, created_at, updated_at,
+				expires_at, payment_received_at, transaction_hash
+				FROM orders WHERE id = $1 AND user_id = $2`
+	} else {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, qr_code_data, status, confirmations, created_at, updated_at,
+				expires_at, payment_received_at, transaction_hash
+				FROM orders WHERE id = ? AND user_id = ?`
+	}
+
+	err := dbConn.QueryRow(query, orderID, userID).Scan(
+		&order.ID, &order.UserID, &order.OrderNumber, &order.Description,
+		&order.AmountUSD, &order.AmountBTC, &order.BTCAddress, &order.QRCodeData,
+		&order.Status, &order.Confirmations, &order.CreatedAt, &order.UpdatedAt,
+		&order.ExpiresAt, &order.PaymentReceivedAt, &order.TransactionHash)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return order, nil
+}
+
+// GetPendingOrders returns all orders with pending status
+func GetPendingOrders() ([]*models.Order, error) {
+	var query string
+	if dbType == "postgres" {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, qr_code_data, status, confirmations, created_at, updated_at,
+				expires_at, payment_received_at, transaction_hash
+				FROM orders WHERE status = 'pending' ORDER BY created_at DESC`
+	} else {
+		query = `SELECT id, user_id, order_number, description, amount_usd, amount_btc, 
+				btc_address, qr_code_data, status, confirmations, created_at, updated_at,
+				expires_at, payment_received_at, transaction_hash
+				FROM orders WHERE status = 'pending' ORDER BY created_at DESC`
+	}
+
+	rows, err := dbConn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var orders []*models.Order
+	for rows.Next() {
+		order := &models.Order{}
+		err := rows.Scan(&order.ID, &order.UserID, &order.OrderNumber, &order.Description,
+			&order.AmountUSD, &order.AmountBTC, &order.BTCAddress, &order.QRCodeData,
+			&order.Status, &order.Confirmations, &order.CreatedAt, &order.UpdatedAt,
+			&order.ExpiresAt, &order.PaymentReceivedAt, &order.TransactionHash)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+	}
+
+	return orders, nil
+}
+
+// UpdateOrderPayment updates an order with payment information
+func UpdateOrderPayment(orderID string, txHash string, amountBTC float64, confirmations int) error {
+	var query string
+	now := time.Now()
+
+	if dbType == "postgres" {
+		query = `UPDATE orders SET 
+				transaction_hash = $1, 
+				amount_btc = $2, 
+				confirmations = $3, 
+				payment_received_at = $4,
+				status = CASE 
+					WHEN $3 >= 6 THEN 'confirmed'
+					WHEN $3 > 0 THEN 'paid'
+					ELSE 'pending'
+				END,
+				updated_at = $4
+				WHERE id = $5`
+	} else {
+		query = `UPDATE orders SET 
+				transaction_hash = ?, 
+				amount_btc = ?, 
+				confirmations = ?, 
+				payment_received_at = ?,
+				status = CASE 
+					WHEN ? >= 6 THEN 'confirmed'
+					WHEN ? > 0 THEN 'paid'
+					ELSE 'pending'
+				END,
+				updated_at = ?
+				WHERE id = ?`
+	}
+
+	if dbType == "postgres" {
+		_, err := dbConn.Exec(query, txHash, amountBTC, confirmations, now, orderID)
+		return err
+	} else {
+		_, err := dbConn.Exec(query, txHash, amountBTC, confirmations, now, confirmations, confirmations, now, orderID)
+		return err
+	}
+}
+
+// UpdateOrderConfirmations updates the confirmation count for an order
+func UpdateOrderConfirmations(orderID string, confirmations int) error {
+	var query string
+	now := time.Now()
+
+	if dbType == "postgres" {
+		query = `UPDATE orders SET 
+				confirmations = $1, 
+				status = CASE 
+					WHEN $1 >= 6 THEN 'confirmed'
+					WHEN $1 > 0 THEN 'paid'
+					ELSE 'pending'
+				END,
+				updated_at = $2
+				WHERE id = $3`
+	} else {
+		query = `UPDATE orders SET 
+				confirmations = ?, 
+				status = CASE 
+					WHEN ? >= 6 THEN 'confirmed'
+					WHEN ? > 0 THEN 'paid'
+					ELSE 'pending'
+				END,
+				updated_at = ?
+				WHERE id = ?`
+	}
+
+	if dbType == "postgres" {
+		_, err := dbConn.Exec(query, confirmations, now, orderID)
+		return err
+	} else {
+		_, err := dbConn.Exec(query, confirmations, confirmations, confirmations, now, orderID)
+		return err
+	}
+}
+
+// CreatePayment creates a new payment record
+func CreatePayment(payment *models.Payment) error {
+	if dbType == "postgres" {
+		err := dbConn.QueryRow(`
+			INSERT INTO payments (order_id, transaction_hash, amount_btc, confirmations, status, detected_at, confirmed_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING id, created_at`,
+			payment.OrderID, payment.TransactionHash, payment.AmountBTC, payment.Confirmations,
+			payment.Status, payment.DetectedAt, payment.ConfirmedAt,
+		).Scan(&payment.ID, &payment.CreatedAt)
+		return err
+	} else {
+		payment.ID = GenerateID()
+		payment.CreatedAt = time.Now()
+
+		_, err := dbConn.Exec(`
+			INSERT INTO payments (id, order_id, transaction_hash, amount_btc, confirmations, status, detected_at, confirmed_at, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			payment.ID, payment.OrderID, payment.TransactionHash, payment.AmountBTC, payment.Confirmations,
+			payment.Status, payment.DetectedAt, payment.ConfirmedAt, payment.CreatedAt,
+		)
+		return err
+	}
+}
+
+// UpdateOrderBitcoinData updates an order with Bitcoin amount and QR code data
+func UpdateOrderBitcoinData(orderID string, amountBTC float64, qrCodeData string) error {
+	var query string
+	now := time.Now()
+
+	if dbType == "postgres" {
+		query = `UPDATE orders SET 
+				amount_btc = $1, 
+				qr_code_data = $2,
+				updated_at = $3
+				WHERE id = $4`
+	} else {
+		query = `UPDATE orders SET 
+				amount_btc = ?, 
+				qr_code_data = ?,
+				updated_at = ?
+				WHERE id = ?`
+	}
+
+	_, err := dbConn.Exec(query, amountBTC, qrCodeData, now, orderID)
+	return err
 }
 
 // debugExistingData checks and logs existing database contents

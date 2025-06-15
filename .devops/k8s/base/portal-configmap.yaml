@@ -16,4 +16,7 @@ data:
   S3_ENDPOINT: "https://nyc3.digitaloceanspaces.com"
   S3_REGION: "nyc3" 
   S3_BUCKET: "medisynth-io"  # Your DigitalOcean Space bucket
-  S3_USE_SSL: "true" 
+  S3_USE_SSL: "true"
+  
+  # Bitcoin payment configuration
+  BITCOIN_ADDRESS: "bc1qxfahvr09gyye3ysdc4dq3gtxlkdduqjhcckmg5" 

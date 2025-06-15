@@ -46,6 +46,9 @@ type Config struct {
 
 	// Admin configuration
 	AdminEmails []string `mapstructure:"ADMIN_EMAILS"` // Comma-separated list of admin emails
+
+	// Bitcoin configuration
+	BitcoinAddress string `mapstructure:"BITCOIN_ADDRESS"` // Bitcoin wallet address for receiving payments
 }
 
 // Database returns a database config struct for backward compatibility
@@ -117,6 +120,7 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("S3_SECRET_ACCESS_KEY", "")
 	v.SetDefault("S3_USE_SSL", true)
 	v.SetDefault("ADMIN_EMAILS", "")
+	v.SetDefault("BITCOIN_ADDRESS", "")
 
 	// Explicitly bind environment variables
 	envVars := []string{
@@ -126,7 +130,7 @@ func LoadConfig() (*Config, error) {
 		"DB_MAX_CONNECTIONS", "DB_MAX_IDLE_CONNECTIONS", "DB_CONNECTION_MAX_LIFETIME",
 		"DOMAIN_PORTAL", "DOMAIN_API", "DOMAIN_SECURE",
 		"S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_USE_SSL",
-		"ADMIN_EMAILS",
+		"ADMIN_EMAILS", "BITCOIN_ADDRESS",
 	}
 
 	for _, envVar := range envVars {
