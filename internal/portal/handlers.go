@@ -649,6 +649,45 @@ func getMapKeys(m map[string]interface{}) []string {
 // ADMIN HANDLERS
 // ============================================================================
 
+func (p *Portal) renderAdminTemplate(w http.ResponseWriter, r *http.Request, tmplName string, pageTitle string, data interface{}) {
+	log.Printf("Rendering admin template: %s", tmplName)
+
+	ts, ok := p.templates[tmplName]
+	if !ok {
+		log.Printf("Error: admin template %s not found", tmplName)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Create a map to hold template data
+	var templateData map[string]interface{}
+	if existingMap, ok := data.(map[string]interface{}); ok {
+		templateData = existingMap
+	} else {
+		templateData = map[string]interface{}{}
+		if data != nil {
+			templateData["Data"] = data
+		}
+	}
+
+	templateData["ActivePage"] = pageTitle
+
+	if userID, ok := r.Context().Value("userID").(string); ok && userID != "" {
+		user, err := database.GetUserByID(userID)
+		if err == nil {
+			templateData["User"] = user
+			templateData["IsAdmin"] = p.config.IsAdmin(user.Email)
+		}
+	}
+
+	// Use the admin base template
+	err := ts.ExecuteTemplate(w, "admin-base.html", templateData)
+	if err != nil {
+		log.Printf("Error rendering admin template %s: %v", tmplName, err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
 func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[ADMIN] Rendering admin dashboard")
 
@@ -665,7 +704,7 @@ func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		"RecentOrders": recentOrders,
 	}
 
-	p.renderTemplate(w, r, "admin-dashboard.html", "Admin Dashboard", data)
+	p.renderAdminTemplate(w, r, "admin-dashboard.html", "Admin Dashboard", data)
 }
 
 func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
@@ -676,7 +715,7 @@ func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to retrieve users.", http.StatusInternalServerError)
 		return
 	}
-	p.renderTemplate(w, r, "admin-users.html", "User Management", map[string]interface{}{
+	p.renderAdminTemplate(w, r, "admin-users.html", "User Management", map[string]interface{}{
 		"Users": users,
 	})
 }
@@ -731,7 +770,7 @@ func (p *Portal) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
 		"Orders": orders,
 	}
 
-	p.renderTemplate(w, r, "admin-orders.html", "Admin Orders", data)
+	p.renderAdminTemplate(w, r, "admin-orders.html", "Order Management", data)
 }
 
 func (p *Portal) handleAdminPayments(w http.ResponseWriter, r *http.Request) {
@@ -748,7 +787,7 @@ func (p *Portal) handleAdminPayments(w http.ResponseWriter, r *http.Request) {
 		"Payments": payments,
 	}
 
-	p.renderTemplate(w, r, "admin-payments.html", "Admin Payments", data)
+	p.renderAdminTemplate(w, r, "admin-payments.html", "Admin Payments", data)
 }
 
 func (p *Portal) handleCreateOrder(w http.ResponseWriter, r *http.Request) {

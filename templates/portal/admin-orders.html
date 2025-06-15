@@ -1,3 +1,9 @@
-<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-    <a href="/admin/orders/{{.ID}}/edit" class="text-indigo-600 hover:text-indigo-900">Edit</a>
-</td> 
+{{template "admin-base.html" .}}
+
+{{define "content"}}
+<div class="space-y-6">
+    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <a href="/admin/orders/{{.ID}}/edit" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+    </td>
+</div>
+{{end}} 
