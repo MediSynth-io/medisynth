@@ -32,6 +32,150 @@
             </div>
         </div>
 
+        <!-- About Section -->
+        <div class="pb-20">
+            <div class="max-w-4xl mx-auto text-center">
+                <h2 class="text-5xl font-bold text-gray-900 mb-8">About MediSynth</h2>
+                <p class="text-xl text-gray-600 leading-relaxed mb-8">
+                    MediSynth isn't just another data generator. We're building the foundation for healthcare innovation by providing developers with synthetic medical data that actually matters. Our platform generates clinically accurate, HIPAA-compliant patient datasets that help you build, test, and scale healthcare applications with confidence.
+                </p>
+                <p class="text-lg text-gray-500 leading-relaxed">
+                    Whether you're developing EMR systems, building ML models, or creating patient management tools, MediSynth provides the realistic data you need to test edge cases, validate algorithms, and ensure your applications work in the real world.
+                </p>
+            </div>
+        </div>
+
+        <!-- Our Goal Section -->
+        <div class="pb-20">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-3xl p-12 text-white">
+                <div class="max-w-4xl mx-auto text-center">
+                    <h2 class="text-5xl font-bold mb-8">Our Goal</h2>
+                    <p class="text-2xl leading-relaxed mb-8">
+                        <span class="font-semibold">Increase developer velocity</span> by providing quick and easy access to synthetic patient data that has real impact on development edge cases.
+                    </p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">
+                        <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
+                            <h3 class="text-xl font-bold mb-4">Beyond Numbers</h3>
+                            <p class="text-lg opacity-90">
+                                We're not playing a "numbers are a thing" game. Every synthetic patient we generate has realistic medical histories, condition relationships, and demographic patterns that mirror real-world healthcare data.
+                            </p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-6">
+                            <h3 class="text-xl font-bold mb-4">Edge Case Testing</h3>
+                            <p class="text-lg opacity-90">
+                                Test your applications against rare conditions, complex comorbidities, and unusual demographic combinations. Our data helps you catch bugs before they reach production.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- API Capabilities Section -->
+        <div class="pb-20">
+            <div class="text-center mb-16">
+                <h2 class="text-5xl font-bold text-gray-900 mb-6">Powerful API Capabilities</h2>
+                <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                    Our API goes far beyond basic patient generation. Create custom scenarios, import demographic restrictions, and build your own medical data modules.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-6xl mx-auto">
+                <!-- Custom Modules -->
+                <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+                    <div class="w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-2xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a1 1 0 01-1-1V9a1 1 0 011-1h1a2 2 0 100-4H4a1 1 0 01-1-1V4a1 1 0 011-1h3a1 1 0 011 1v1z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Custom Modules</h3>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Build your own Synthea modules to generate specific medical scenarios. Import custom JSON modules via our API to create targeted patient populations with unique conditions, treatments, and outcomes.
+                    </p>
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <pre class="text-sm text-gray-700"><code>POST /generate-patients
+{
+  "population": 100,
+  "customModules": [
+    "https://your-domain.com/covid-variants.json",
+    "/path/to/rare-diseases.json"
+  ]
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Demographic Controls -->
+                <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+                    <div class="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-2xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Demographic Restrictions</h3>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Precisely control patient demographics with granular API parameters. Set age ranges, gender distributions, geographic locations, and socioeconomic factors to match your specific use case.
+                    </p>
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <pre class="text-sm text-gray-700"><code>POST /generate-patients
+{
+  "population": 500,
+  "ageMin": 65, "ageMax": 85,
+  "state": "California",
+  "city": "San Francisco",
+  "keepLogic": "AND"
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Condition Targeting -->
+                <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+                    <div class="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v6a2 2 0 002 2h2m0 0h2m-2 0v4a2 2 0 002 2h2a2 2 0 002-2v-4m0 0V9a2 2 0 00-2-2H9z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Condition Targeting</h3>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Generate patients with specific medical conditions using SNOMED-CT codes. Create cohorts with diabetes, hypertension, rare diseases, or complex comorbidity patterns for comprehensive testing.
+                    </p>
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <pre class="text-sm text-gray-700"><code>POST /generate-patients
+{
+  "keepActiveConditions": [
+    {
+      "system": "SNOMED-CT",
+      "code": "44054006",
+      "display": "Type 2 diabetes"
+    }
+  ]
+}</code></pre>
+                    </div>
+                </div>
+
+                <!-- Output Formats -->
+                <div class="bg-white rounded-3xl p-8 shadow-xl border border-gray-100">
+                    <div class="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mb-6">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Multiple Output Formats</h3>
+                    <p class="text-gray-600 mb-6 leading-relaxed">
+                        Get your data in the format you need: FHIR bundles for interoperability, CCDA documents for clinical systems, or CSV files for data analysis and machine learning workflows.
+                    </p>
+                    <div class="bg-gray-50 rounded-xl p-4">
+                        <pre class="text-sm text-gray-700"><code>POST /generate-patients
+{
+  "population": 1000,
+  "outputFormat": "fhir",
+  // Options: "fhir", "ccda", "csv"
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Feature highlights -->
         <div class="pb-20">
             <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-10">
