@@ -744,13 +744,37 @@ func (p *Portal) renderAdminTemplate(w http.ResponseWriter, r *http.Request, tmp
 }
 
 func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[ADMIN] Rendering admin dashboard")
+	// Get total users count
+	totalUsers, err := database.GetUserCount()
+	if err != nil {
+		logRequest(r, "ADMIN", "Failed to get total users:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
-	// Get admin statistics
-	totalUsers, _ := database.GetUserCount()
-	totalOrders, _ := database.GetOrderCount()
-	totalRevenue, _ := database.GetTotalRevenue()
-	recentOrders, _ := database.GetRecentOrders(10)
+	// Get total orders count
+	totalOrders, err := database.GetOrderCount()
+	if err != nil {
+		logRequest(r, "ADMIN", "Failed to get total orders:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Get total revenue
+	totalRevenue, err := database.GetTotalRevenue()
+	if err != nil {
+		logRequest(r, "ADMIN", "Failed to get total revenue:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Get recent orders
+	recentOrders, err := database.GetRecentOrders(5)
+	if err != nil {
+		logRequest(r, "ADMIN", "Failed to get recent orders:", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	data := map[string]interface{}{
 		"TotalUsers":   totalUsers,
@@ -1036,34 +1060,5 @@ func (p *Portal) handleJobOutputs(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "job-outputs.html", "Job Outputs", map[string]interface{}{
 		"JobID": jobID,
 		"Files": files,
-	})
-}
-
-func (p *Portal) requireAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value("userID").(string)
-		ip := r.RemoteAddr
-
-		if !ok {
-			logRequest(r, "ADMIN_AUTH", "Forbidden: No user ID in context from IP:", ip)
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		user, err := database.GetUserByID(userID)
-		if err != nil {
-			logRequest(r, "ADMIN_AUTH", "Forbidden: User not found with ID:", userID, "from IP:", ip, "Error:", err)
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		if !p.config.IsAdmin(user.Email) {
-			logRequest(r, "ADMIN_AUTH", "Forbidden: User is not an admin:", user.Email, "from IP:", ip)
-			http.Error(w, "Forbidden", http.StatusForbidden)
-			return
-		}
-
-		logRequest(r, "ADMIN_AUTH", "Admin access granted for", user.Email, "from IP:", ip)
-		next.ServeHTTP(w, r)
 	})
 }
