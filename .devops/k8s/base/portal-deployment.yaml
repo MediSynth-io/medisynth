@@ -37,6 +37,12 @@ spec:
                 name: medisynth-postgres-app-credentials
             - secretRef:
                 name: medisynth-admin-config
+          env:
+            - name: BITCOIN_ADDRESS
+              valueFrom:
+                configMapKeyRef:
+                  name: medisynth-portal-config
+                  key: BITCOIN_ADDRESS
           resources:
             requests:
               memory: "128Mi"
