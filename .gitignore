@@ -1,1 +1,11 @@
 cmd/api/medisynth-api
+/app/data
+/data
+data/
+.DS_Store
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+.idea/
+.vscode/
