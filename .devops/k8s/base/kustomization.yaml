@@ -4,6 +4,7 @@ kind: Kustomization
 resources:
   - api-configmap.yaml
   - portal-configmap.yaml
+  - s3-secret.yaml
   - api-deployment.yaml
   - portal-deployment.yaml
   - portal-service.yaml

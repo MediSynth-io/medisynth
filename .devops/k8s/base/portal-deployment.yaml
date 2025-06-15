@@ -4,7 +4,7 @@ metadata:
   name: medisynth-portal
   namespace: medisynth-io
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: medisynth-portal
@@ -28,6 +28,8 @@ spec:
                 name: medisynth-portal-config
             - secretRef:
                 name: medisynth-secrets
+            - secretRef:
+                name: medisynth-s3-credentials
           resources:
             requests:
               memory: "128Mi"

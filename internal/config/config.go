@@ -23,6 +23,14 @@ type Config struct {
 	DomainPortal string `mapstructure:"DOMAIN_PORTAL"`
 	DomainAPI    string `mapstructure:"DOMAIN_API"`
 	DomainSecure bool   `mapstructure:"DOMAIN_SECURE"`
+
+	// DigitalOcean Spaces configuration
+	S3Endpoint        string `mapstructure:"S3_ENDPOINT"`          // e.g. https://nyc3.digitaloceanspaces.com
+	S3Region          string `mapstructure:"S3_REGION"`            // e.g. nyc3, ams3, sgp1
+	S3Bucket          string `mapstructure:"S3_BUCKET"`            // Your DigitalOcean Space name
+	S3AccessKeyID     string `mapstructure:"S3_ACCESS_KEY_ID"`     // DigitalOcean Spaces Key
+	S3SecretAccessKey string `mapstructure:"S3_SECRET_ACCESS_KEY"` // DigitalOcean Spaces Secret
+	S3UseSSL          bool   `mapstructure:"S3_USE_SSL"`
 }
 
 // Database returns a database config struct for backward compatibility
@@ -77,12 +85,19 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("DOMAIN_SECURE", true)
 	v.SetDefault("API_URL", "https://api.medisynth.io")
 	v.SetDefault("API_INTERNAL_URL", "http://medisynth-api-svc:8081")
+	v.SetDefault("S3_ENDPOINT", "https://nyc3.digitaloceanspaces.com")
+	v.SetDefault("S3_REGION", "nyc3")
+	v.SetDefault("S3_BUCKET", "medisynth-data")
+	v.SetDefault("S3_ACCESS_KEY_ID", "")
+	v.SetDefault("S3_SECRET_ACCESS_KEY", "")
+	v.SetDefault("S3_USE_SSL", true)
 
 	// Explicitly bind environment variables
 	envVars := []string{
 		"API_PORT", "API_URL", "API_INTERNAL_URL",
 		"DB_PATH", "DB_SOCKET_PATH", "DB_WAL_MODE", "DB_MAX_RETRIES", "DB_RETRY_DELAY",
 		"DOMAIN_PORTAL", "DOMAIN_API", "DOMAIN_SECURE",
+		"S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_USE_SSL",
 	}
 
 	for _, envVar := range envVars {

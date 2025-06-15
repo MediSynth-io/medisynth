@@ -52,6 +52,8 @@ spec:
                 name: medisynth-api-config
             - secretRef:
                 name: medisynth-secrets
+            - secretRef:
+                name: medisynth-s3-credentials
           securityContext:
             runAsUser: 1000
             runAsGroup: 1000
