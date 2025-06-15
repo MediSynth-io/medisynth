@@ -486,14 +486,14 @@ func GetUserByEmail(email string) (*models.User, error) {
 
 	if dbType == "postgres" {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE email = $1",
+			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE email = $1",
 			email,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	} else {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE email = ?",
+			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE email = ?",
 			email,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	}
 
 	if err != nil {
@@ -509,14 +509,14 @@ func GetUserByID(id string) (*models.User, error) {
 
 	if dbType == "postgres" {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE id = $1",
+			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE id = $1",
 			id,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	} else {
 		err = dbConn.QueryRow(
-			"SELECT id, email, password, is_admin, created_at, updated_at FROM users WHERE id = ?",
+			"SELECT id, email, password, is_admin, force_password_reset, created_at, updated_at FROM users WHERE id = ?",
 			id,
-		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+		).Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 	}
 
 	if err != nil {
@@ -552,12 +552,12 @@ func MakeUserAdmin(userID string) error {
 }
 
 // GetAllUsers retrieves all users (admin only)
-func GetAllUsers() ([]*models.User, error) {
+func GetAllUsers() ([]models.User, error) {
 	var query string
 	if dbType == "postgres" {
-		query = "SELECT id, email, password, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
+		query = "SELECT id, email, is_admin, force_password_reset, created_at, updated_at FROM users ORDER BY created_at DESC"
 	} else {
-		query = "SELECT id, email, password, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
+		query = "SELECT id, email, is_admin, force_password_reset, created_at, updated_at FROM users ORDER BY created_at DESC"
 	}
 
 	rows, err := dbConn.Query(query)
@@ -566,10 +566,10 @@ func GetAllUsers() ([]*models.User, error) {
 	}
 	defer rows.Close()
 
-	var users []*models.User
+	var users []models.User
 	for rows.Next() {
-		user := &models.User{}
-		err := rows.Scan(&user.ID, &user.Email, &user.Password, &user.IsAdmin, &user.CreatedAt, &user.UpdatedAt)
+		user := models.User{}
+		err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -1213,4 +1213,81 @@ func debugExistingData(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+// SetForcePasswordReset sets the force_password_reset flag for a user
+func SetForcePasswordReset(userID string, force bool) error {
+	var query string
+	if dbType == "postgres" {
+		query = "UPDATE users SET force_password_reset = $1, updated_at = NOW() WHERE id = $2"
+	} else {
+		query = "UPDATE users SET force_password_reset = ?, updated_at = ? WHERE id = ?"
+	}
+
+	if dbType == "postgres" {
+		_, err := dbConn.Exec(query, force, userID)
+		return err
+	}
+	_, err := dbConn.Exec(query, force, time.Now(), userID)
+	return err
+}
+
+// DeleteUserByID deletes a user from the database
+func DeleteUserByID(userID string) error {
+	var query string
+	if dbType == "postgres" {
+		query = "DELETE FROM users WHERE id = $1"
+	} else {
+		query = "DELETE FROM users WHERE id = ?"
+	}
+	_, err := dbConn.Exec(query, userID)
+	return err
+}
+
+// UpdateOrder updates an existing order's details
+func UpdateOrder(order *models.Order) error {
+	var query string
+	if dbType == "postgres" {
+		query = `UPDATE orders SET
+			description = $1,
+			amount_usd = $2,
+			amount_btc = $3,
+			status = $4,
+			updated_at = NOW()
+			WHERE id = $5`
+	} else {
+		query = `UPDATE orders SET
+			description = ?,
+			amount_usd = ?,
+			amount_btc = ?,
+			status = ?,
+			updated_at = ?
+			WHERE id = ?`
+	}
+
+	if dbType == "postgres" {
+		_, err := dbConn.Exec(query, order.Description, order.AmountUSD, order.AmountBTC, order.Status, order.ID)
+		return err
+	}
+	_, err := dbConn.Exec(query, order.Description, order.AmountUSD, order.AmountBTC, order.Status, time.Now(), order.ID)
+	return err
+}
+
+// GetAllUsers returns all users from the database
+func GetAllUsers() ([]models.User, error) {
+	var users []models.User
+	query := "SELECT id, email, is_admin, force_password_reset, created_at, updated_at FROM users ORDER BY created_at DESC"
+	rows, err := dbConn.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Email, &u.IsAdmin, &u.ForcePasswordReset, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, nil
 }

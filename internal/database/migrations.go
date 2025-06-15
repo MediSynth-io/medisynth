@@ -131,6 +131,11 @@ func getPostgresMigrations() []Migration {
 				CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 				CREATE INDEX IF NOT EXISTS idx_payments_transaction_hash ON payments(transaction_hash);`,
 		},
+		{
+			Version:     8,
+			Description: "Add force password reset to users",
+			SQL:         "ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT FALSE;",
+		},
 	}
 }
 
@@ -245,6 +250,11 @@ func getSQLiteMigrations() []Migration {
 				CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
 				CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
 				CREATE INDEX IF NOT EXISTS idx_payments_transaction_hash ON payments(transaction_hash);`,
+		},
+		{
+			Version:     8,
+			Description: "Add force password reset to users",
+			SQL:         "ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT 0;",
 		},
 	}
 }

@@ -150,9 +150,12 @@ func (p *Portal) Routes() http.Handler {
 
 		r.Get("/admin", p.handleAdminDashboard)
 		r.Get("/admin/users", p.handleAdminUsers)
+		r.Post("/admin/users/{userID}/delete", p.handleAdminDeleteUser)
+		r.Post("/admin/users/{userID}/force-password-reset", p.handleAdminForcePasswordReset)
 		r.Get("/admin/orders", p.handleAdminOrders)
-		r.Get("/admin/payments", p.handleAdminPayments)
 		r.Post("/admin/orders/create", p.handleCreateOrder)
+		r.Get("/admin/orders/{orderID}/edit", p.handleAdminEditOrderForm)
+		r.Post("/admin/orders/{orderID}/edit", p.handleAdminUpdateOrder)
 	})
 
 	// User order routes

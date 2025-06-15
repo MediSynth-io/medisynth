@@ -665,20 +665,52 @@ func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
-	log.Printf("[ADMIN] Rendering admin users page")
-
+	logRequest(r, "ADMIN", "Viewing user management page")
 	users, err := database.GetAllUsers()
 	if err != nil {
-		log.Printf("[ADMIN] Error getting users: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		logRequest(r, "ADMIN", "Error getting all users:", err)
+		http.Error(w, "Failed to retrieve users.", http.StatusInternalServerError)
+		return
+	}
+	p.renderTemplate(w, r, "admin-users.html", "User Management", map[string]interface{}{
+		"Users": users,
+	})
+}
+
+func (p *Portal) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "userID")
+	logRequest(r, "ADMIN", "Attempting to delete user:", userID)
+
+	// Prevent admin from deleting themselves
+	sessionUserID, _ := r.Context().Value("userID").(string)
+	if userID == sessionUserID {
+		logRequest(r, "ADMIN", "Admin attempted to self-delete")
+		http.Error(w, "You cannot delete your own account.", http.StatusBadRequest)
 		return
 	}
 
-	data := map[string]interface{}{
-		"Users": users,
+	if err := database.DeleteUserByID(userID); err != nil {
+		logRequest(r, "ADMIN", "Failed to delete user", userID, ":", err)
+		http.Error(w, "Failed to delete user.", http.StatusInternalServerError)
+		return
 	}
 
-	p.renderTemplate(w, r, "admin-users.html", "Admin Users", data)
+	logRequest(r, "ADMIN", "Successfully deleted user:", userID)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (p *Portal) handleAdminForcePasswordReset(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "userID")
+	logRequest(r, "ADMIN", "Attempting to force password reset for user:", userID)
+
+	if err := database.SetForcePasswordReset(userID, true); err != nil {
+		logRequest(r, "ADMIN", "Failed to force password reset for user", userID, ":", err)
+		http.Error(w, "Failed to set password reset flag.", http.StatusInternalServerError)
+		return
+	}
+
+	logRequest(r, "ADMIN", "Successfully flagged user for password reset:", userID)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 func (p *Portal) handleAdminOrders(w http.ResponseWriter, r *http.Request) {
@@ -861,4 +893,26 @@ type responseWriter struct {
 
 func (rw *responseWriter) Context() context.Context {
 	return rw.req.Context()
+}
+
+func (p *Portal) handleAdminUpdateOrder(w http.ResponseWriter, r *http.Request) {
+	orderID := chi.URLParam(r, "orderID")
+	logRequest(r, "ADMIN", "Attempting to update order:", orderID)
+
+	// In a real application, you would parse the form and update the order
+	// For this example, we'll just log it and redirect
+	logRequest(r, "ADMIN", "Order update logic would go here for order:", orderID)
+
+	http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)
+}
+
+func (p *Portal) handleAdminEditOrderForm(w http.ResponseWriter, r *http.Request) {
+	orderID := chi.URLParam(r, "orderID")
+	logRequest(r, "ADMIN", "Showing edit form for order:", orderID)
+
+	// In a real application, you would fetch the order details
+	// For this example, we'll just render a placeholder
+	p.renderTemplate(w, r, "admin-edit-order.html", "Edit Order", map[string]interface{}{
+		"OrderID": orderID,
+	})
 }
