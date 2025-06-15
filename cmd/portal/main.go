@@ -29,7 +29,7 @@ func initializePortal(configPath string) (http.Handler, error) {
 }
 
 func main() {
-	configPath := flag.String("config", "app.yml", "Path to configuration file")
+	configPath := flag.String("config", "", "Path to configuration file")
 	flag.Parse()
 
 	log.Printf("Starting MediSynth Portal v%s with config: %s", version, *configPath)

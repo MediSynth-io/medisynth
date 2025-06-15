@@ -41,7 +41,7 @@ func initializeAPI(configPath string) (*api.Api, error) {
 }
 
 func main() {
-	configPath := flag.String("config", "app.yml", "Path to configuration file")
+	configPath := flag.String("config", "", "Path to configuration file")
 	flag.Parse()
 
 	log.Printf("Starting MediSynth API v%s with config: %s", version, *configPath)
