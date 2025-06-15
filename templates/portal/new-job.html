@@ -22,8 +22,9 @@
                         </div>
                         <div class="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                             <div class="sm:col-span-2">
-                                <label for="population" class="block text-sm font-medium text-gray-700">Population Size</label>
-                                <input type="number" name="population" id="population" value="10" required class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                <label for="population" class="block text-sm font-medium text-gray-700">Population Size <span class="text-red-500">*</span></label>
+                                <input type="number" name="population" id="population" value="10" min="1" max="1000" required class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-sm text-gray-500">Number of patients to generate (1-1000)</p>
                             </div>
 
                             <div class="sm:col-span-2">
@@ -33,15 +34,17 @@
                                     <option value="M">Male</option>
                                     <option value="F">Female</option>
                                 </select>
+                                <p class="mt-1 text-sm text-gray-500">Leave empty for random distribution</p>
                             </div>
                             
                             <div class="sm:col-span-2">
                                 <label for="age" class="block text-sm font-medium text-gray-700">Age Range</label>
                                 <div class="flex items-center mt-1">
-                                    <input type="number" name="ageMin" id="ageMin" placeholder="Min" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <input type="number" name="ageMin" id="ageMin" placeholder="Min" min="0" max="120" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
                                     <span class="mx-2 text-gray-500">-</span>
-                                    <input type="number" name="ageMax" id="ageMax" placeholder="Max" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <input type="number" name="ageMax" id="ageMax" placeholder="Max" min="0" max="120" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
                                 </div>
+                                <p class="mt-1 text-sm text-gray-500">Leave empty for all ages</p>
                             </div>
                         </div>
                     </div>
@@ -53,13 +56,89 @@
                         </div>
                         <div class="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                             <div class="sm:col-span-3">
-                                <label for="state" class="block text-sm font-medium text-gray-700">State</label>
-                                <input type="text" name="state" id="state" placeholder="e.g. MA" class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                <label for="state" class="block text-sm font-medium text-gray-700">State <span class="text-red-500">*</span></label>
+                                <input type="text" name="state" id="state" value="MA" maxlength="2" required class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-sm text-gray-500">Two-letter state code (e.g. MA)</p>
                             </div>
 
                             <div class="sm:col-span-3">
                                 <label for="city" class="block text-sm font-medium text-gray-700">City (Optional)</label>
                                 <input type="text" name="city" id="city" placeholder="e.g. Boston" class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                <p class="mt-1 text-sm text-gray-500">Leave empty for state-wide distribution</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-8">
+                        <div>
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">Medical Conditions</h3>
+                            <p class="mt-1 text-sm text-gray-500">Select which medical conditions to include in the generated data.</p>
+                        </div>
+                        <div class="mt-6">
+                            <div class="space-y-4">
+                                <div class="flex items-center">
+                                    <input type="checkbox" name="keepModules" value="all" id="allModules" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <label for="allModules" class="ml-3 block text-sm font-medium text-gray-700">Include All Conditions</label>
+                                </div>
+                                
+                                <div class="grid grid-cols-1 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <!-- Chronic Conditions -->
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-900">Chronic Conditions</h4>
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="diabetes" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Diabetes</label>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="hypertension" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Hypertension</label>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="asthma" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Asthma</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Acute Conditions -->
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-900">Acute Conditions</h4>
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="flu" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Influenza</label>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="pneumonia" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Pneumonia</label>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="uti" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">UTI</label>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Mental Health -->
+                                    <div class="space-y-2">
+                                        <h4 class="text-sm font-medium text-gray-900">Mental Health</h4>
+                                        <div class="space-y-2">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="depression" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Depression</label>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="anxiety" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">Anxiety</label>
+                                            </div>
+                                            <div class="flex items-center">
+                                                <input type="checkbox" name="keepModules" value="adhd" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                                <label class="ml-3 block text-sm text-gray-700">ADHD</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -70,12 +149,13 @@
                         </div>
                         <div class="mt-6 grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-6">
                             <div class="sm:col-span-3">
-                                <label for="outputFormat" class="block text-sm font-medium text-gray-700">Output Format</label>
-                                <select id="outputFormat" name="outputFormat" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                                    <option>fhir</option>
-                                    <option>ccda</option>
-                                    <option>csv</option>
+                                <label for="outputFormat" class="block text-sm font-medium text-gray-700">Output Format <span class="text-red-500">*</span></label>
+                                <select id="outputFormat" name="outputFormat" required class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                    <option value="fhir">FHIR</option>
+                                    <option value="ccda">CCDA</option>
+                                    <option value="csv">CSV</option>
                                 </select>
+                                <p class="mt-1 text-sm text-gray-500">Format for the generated patient data</p>
                             </div>
                         </div>
                     </div>
@@ -95,4 +175,29 @@
         </div>
     </main>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const allModulesCheckbox = document.getElementById('allModules');
+    const moduleCheckboxes = document.querySelectorAll('input[name="keepModules"]:not([value="all"])');
+    
+    allModulesCheckbox.addEventListener('change', function() {
+        moduleCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+            checkbox.disabled = this.checked;
+        });
+    });
+
+    moduleCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (!this.checked) {
+                allModulesCheckbox.checked = false;
+            } else {
+                const allChecked = Array.from(moduleCheckboxes).every(cb => cb.checked);
+                allModulesCheckbox.checked = allChecked;
+            }
+        });
+    });
+});
+</script>
 {{end}} 

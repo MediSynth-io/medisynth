@@ -567,6 +567,20 @@ func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get all selected modules
+	var keepModules []string
+	if r.FormValue("keepModules") == "all" {
+		// If "all" is selected, use all available modules
+		keepModules = []string{
+			"diabetes", "hypertension", "asthma",
+			"flu", "pneumonia", "uti",
+			"depression", "anxiety", "adhd",
+		}
+	} else {
+		// Otherwise, get individually selected modules
+		keepModules = r.Form["keepModules"]
+	}
+
 	params := models.SyntheaParams{
 		Population:   toIntPtr(r.FormValue("population")),
 		Gender:       toStringPtr(r.FormValue("gender")),
@@ -575,6 +589,7 @@ func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		State:        toStringPtr(r.FormValue("state")),
 		City:         toStringPtr(r.FormValue("city")),
 		OutputFormat: toStringPtr(r.FormValue("outputFormat")),
+		KeepModules:  keepModules,
 	}
 
 	bodyBytes, err := json.Marshal(params)

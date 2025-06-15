@@ -128,13 +128,14 @@ const (
 
 // SyntheaParams defines the parameters for a Synthea generation job
 type SyntheaParams struct {
-	Population   *int    `json:"population,omitempty"`
-	Gender       *string `json:"gender,omitempty"`
-	AgeMin       *int    `json:"ageMin,omitempty"`
-	AgeMax       *int    `json:"ageMax,omitempty"`
-	State        *string `json:"state,omitempty"`
-	City         *string `json:"city,omitempty"`
-	OutputFormat *string `json:"outputFormat,omitempty"`
+	Population   *int     `json:"population,omitempty"`
+	Gender       *string  `json:"gender,omitempty"`
+	AgeMin       *int     `json:"ageMin,omitempty"`
+	AgeMax       *int     `json:"ageMax,omitempty"`
+	State        *string  `json:"state,omitempty"`
+	City         *string  `json:"city,omitempty"`
+	OutputFormat *string  `json:"outputFormat,omitempty"`
+	KeepModules  []string `json:"keepModules,omitempty"`
 }
 
 // Job represents a data generation job
