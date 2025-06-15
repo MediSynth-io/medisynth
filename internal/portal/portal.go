@@ -106,6 +106,15 @@ func (p *Portal) Routes() http.Handler {
 		})
 	})
 
+	// Walk and log all registered routes
+	walkFunc := func(method string, route string, handler http.Handler, middlewares ...func(http.Handler) http.Handler) error {
+		log.Printf("Registered route: %s %s", method, route)
+		return nil
+	}
+	if err := chi.Walk(r, walkFunc); err != nil {
+		log.Printf("Error walking routes: %s\n", err.Error())
+	}
+
 	return r
 }
 
