@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"strings"
 
@@ -91,8 +92,10 @@ func LoadConfig() (*Config, error) {
 	v.AutomaticEnv()
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// Set defaults
+	// Set defaults for all config variables
 	v.SetDefault("API_PORT", 8081)
+	v.SetDefault("API_URL", "https://api.medisynth.io")
+	v.SetDefault("API_INTERNAL_URL", "http://medisynth-api-svc:8081")
 	v.SetDefault("DB_TYPE", "sqlite")
 	v.SetDefault("DB_PATH", "/data/medisynth.db")
 	v.SetDefault("DB_SOCKET_PATH", "/data/sqlite.sock")
@@ -111,8 +114,6 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("DOMAIN_PORTAL", "portal.medisynth.io")
 	v.SetDefault("DOMAIN_API", "api.medisynth.io")
 	v.SetDefault("DOMAIN_SECURE", true)
-	v.SetDefault("API_URL", "https://api.medisynth.io")
-	v.SetDefault("API_INTERNAL_URL", "http://medisynth-api-svc:8081")
 	v.SetDefault("S3_ENDPOINT", "https://nyc3.digitaloceanspaces.com")
 	v.SetDefault("S3_REGION", "nyc3")
 	v.SetDefault("S3_BUCKET", "medisynth-data")
@@ -120,33 +121,15 @@ func LoadConfig() (*Config, error) {
 	v.SetDefault("S3_SECRET_ACCESS_KEY", "")
 	v.SetDefault("S3_USE_SSL", true)
 	v.SetDefault("ADMIN_EMAILS", "")
-	v.SetDefault("BITCOIN_ADDRESS", "")
-
-	// Explicitly bind all environment variables to ensure they are read
-	envVars := []string{
-		"API_PORT", "API_URL", "API_INTERNAL_URL",
-		"DB_TYPE", "DB_PATH", "DB_SOCKET_PATH", "DB_WAL_MODE", "DB_MAX_RETRIES", "DB_RETRY_DELAY",
-		"DB_HOST", "DB_PORT", "DB_NAME", "DB_USER", "DB_PASSWORD", "DB_SSL_MODE",
-		"DB_MAX_CONNECTIONS", "DB_MAX_IDLE_CONNECTIONS", "DB_CONNECTION_MAX_LIFETIME",
-		"DOMAIN_PORTAL", "DOMAIN_API", "DOMAIN_SECURE",
-		"S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_USE_SSL",
-		"ADMIN_EMAILS", "BITCOIN_ADDRESS",
-	}
-
-	for _, envVar := range envVars {
-		err := v.BindEnv(strings.ToLower(strings.ReplaceAll(envVar, "_", ".")))
-		if err != nil {
-			log.Printf("Warning: could not bind env var %s: %v", envVar, err)
-		}
-	}
+	v.SetDefault("BITCOIN_ADDRESS", "") // This is the key field
 
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// For ADMIN_EMAILS, viper's automatic string-to-slice conversion is tricky with env vars.
-	// We handle it manually for robustness.
+	// Viper's unmarshaling of comma-separated strings from env vars can be unreliable.
+	// We handle it manually here to ensure it works correctly.
 	adminEmailsStr := v.GetString("ADMIN_EMAILS")
 	if adminEmailsStr != "" {
 		cfg.AdminEmails = strings.Split(adminEmailsStr, ",")
@@ -155,11 +138,12 @@ func LoadConfig() (*Config, error) {
 		}
 	}
 
-	log.Printf("Configuration loaded successfully. Admin emails count: %d", len(cfg.AdminEmails))
+	// Final verification log
+	log.Printf("Configuration loaded. Admin emails: %d", len(cfg.AdminEmails))
 	if cfg.BitcoinAddress != "" {
-		log.Printf("Bitcoin address loaded: %s", cfg.BitcoinAddress)
+		log.Printf("Bitcoin address loaded successfully: %s", cfg.BitcoinAddress)
 	} else {
-		log.Printf("Warning: BITCOIN_ADDRESS is not set in the environment.")
+		log.Printf("CRITICAL WARNING: BITCOIN_ADDRESS is not set. Payment functionality will fail.")
 	}
 
 	return &cfg, nil
