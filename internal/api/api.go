@@ -245,8 +245,10 @@ func (api *Api) RunSyntheaGeneration(w http.ResponseWriter, r *http.Request) {
 		UserID:       userID,
 		JobID:        "synthea-" + database.GenerateID(),
 		Status:       models.JobStatusPending,
-		Parameters:   params.ToMap(),
-		OutputFormat: params.GetOutputFormat(),
+		Parameters:   &params,
+		OutputFormat: params.OutputFormat,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	if err := job.MarshalParameters(); err != nil {
@@ -308,20 +310,8 @@ func (api *Api) executeSyntheaJob(job *models.Job) {
 		return
 	}
 
-	// Base synthea command
-	cmdArgs := []string{"-p", syntheaArgs.Population}
-
-	// Add other parameters from SyntheaParams as needed
-	if syntheaArgs.Gender != "" {
-		cmdArgs = append(cmdArgs, "-g", syntheaArgs.Gender)
-	}
-	if syntheaArgs.AgeRange != "" {
-		cmdArgs = append(cmdArgs, "-a", syntheaArgs.AgeRange)
-	}
-	if syntheaArgs.City != "" {
-		cmdArgs = append(cmdArgs, "--city", syntheaArgs.City)
-	}
-
+	// The GetSyntheaArgs now returns a slice of strings
+	cmdArgs := syntheaArgs
 	cmdArgs = append(cmdArgs, "--exporter.base_directory", outputDir)
 
 	log.Printf("Running Synthea for job %s with args: %v", job.ID, cmdArgs)
@@ -354,8 +344,11 @@ func (api *Api) executeSyntheaJob(job *models.Job) {
 		return
 	}
 
-	population, _ := job.Parameters["population"].(float64)
-	patientCount := int(population)
+	population := 0
+	if job.Parameters != nil && job.Parameters.Population != nil {
+		population = *job.Parameters.Population
+	}
+	patientCount := population
 
 	err = database.UpdateJobStatus(job.ID, models.JobStatusCompleted, nil, &s3KeyPrefix, nil, &patientCount)
 	if err != nil {

@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -188,6 +190,32 @@ func (j *Job) UnmarshalParameters() error {
 	}
 	j.Parameters = params
 	return nil
+}
+
+// GetSyntheaArgs prepares the command-line arguments for the Synthea process.
+func (j *Job) GetSyntheaArgs() ([]string, error) {
+	if j.Parameters == nil {
+		return nil, fmt.Errorf("job has no parameters")
+	}
+
+	args := []string{}
+	if j.Parameters.Population != nil {
+		args = append(args, "-p", strconv.Itoa(*j.Parameters.Population))
+	}
+	if j.Parameters.Gender != nil {
+		args = append(args, "-g", *j.Parameters.Gender)
+	}
+	if j.Parameters.AgeMin != nil && j.Parameters.AgeMax != nil {
+		args = append(args, "-a", fmt.Sprintf("%d-%d", *j.Parameters.AgeMin, *j.Parameters.AgeMax))
+	}
+	if j.Parameters.State != nil {
+		args = append(args, "-s", *j.Parameters.State)
+	}
+	if j.Parameters.City != nil {
+		args = append(args, "--city", *j.Parameters.City)
+	}
+
+	return args, nil
 }
 
 // IsExpired checks if the order has expired
