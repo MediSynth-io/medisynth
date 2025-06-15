@@ -80,7 +80,6 @@ func (p *Portal) Routes() http.Handler {
 			p.handleLanding(w, r)
 		}
 	})
-	r.Get("/about", p.handleAbout)
 	r.Get("/login", p.handleLoginRedirect)
 	r.Get("/register", p.handleRegisterRedirect)
 	r.Post("/login", p.handleLoginRedirect)

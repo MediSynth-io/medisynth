@@ -68,10 +68,6 @@ func (p *Portal) handleRegisterRedirect(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (p *Portal) handleAbout(w http.ResponseWriter, r *http.Request) {
-	p.renderTemplate(w, r, "about.html", "About", map[string]interface{}{})
-}
-
 func (p *Portal) handleDocumentation(w http.ResponseWriter, r *http.Request) {
 	p.renderTemplate(w, r, "documentation.html", "Documentation", map[string]interface{}{})
 }
