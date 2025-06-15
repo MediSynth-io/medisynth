@@ -105,16 +105,16 @@ jobs:
     if: success() && (needs.changes.outputs.api == 'true' || needs.changes.outputs.portal == 'true')
     runs-on: ubuntu-latest
     steps:
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v3
-      - name: Set up kubeconfig
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 --decode > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
+      - name: Set up Kubeconfig
+        uses: azure/k8s-set-context@v3
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+
       - name: Rollout API deployment
         if: needs.changes.outputs.api == 'true'
         run: kubectl rollout restart deployment/medisynth-api -n medisynth-io
+
       - name: Rollout Portal deployment
         if: needs.changes.outputs.portal == 'true'
         run: kubectl rollout restart deployment/medisynth-portal -n medisynth-io 
