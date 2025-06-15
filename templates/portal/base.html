@@ -41,15 +41,15 @@
                             <a href="/tokens" class="{{if eq .ActivePage "API Tokens"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                 API Tokens
                             </a>
+                            <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                Documentation
+                            </a>
                         {{else}}
                             <!-- Public Navigation -->
                             <a href="/" class="{{if eq .ActivePage "Home"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
                                 Home
                             </a>
                         {{end}}
-                        <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600 hover:text-gray-900 hover:bg-gray-50{{end}} px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                            Documentation
-                        </a>
                     </div>
                 </div>
 
@@ -122,7 +122,6 @@
                 {{else}}
                     <!-- Mobile Public Navigation -->
                     <a href="/" class="{{if eq .ActivePage "Home"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Home</a>
-                    <a href="/documentation" class="{{if eq .ActivePage "Documentation"}}bg-indigo-100 text-indigo-700{{else}}text-gray-600{{end}} block px-3 py-2 rounded-md text-base font-medium">Documentation</a>
                     <hr class="my-2">
                     <a href="/login" class="text-gray-600 block px-3 py-2 rounded-md text-base font-medium">Sign in</a>
                     <a href="/register" class="bg-indigo-600 text-white block px-3 py-2 rounded-md text-base font-medium">Get started</a>
@@ -156,7 +155,9 @@
         <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="flex items-center space-x-6 mb-4 md:mb-0">
-                    <a href="/documentation" class="text-gray-500 hover:text-gray-700 text-sm">Documentation</a>
+                    {{if .User}}
+                        <a href="/documentation" class="text-gray-500 hover:text-gray-700 text-sm">Documentation</a>
+                    {{end}}
                     <a href="#" class="text-gray-500 hover:text-gray-700 text-sm">API Reference</a>
                     <a href="#" class="text-gray-500 hover:text-gray-700 text-sm">Support</a>
                     <a href="#" class="text-gray-500 hover:text-gray-700 text-sm">Status</a>
