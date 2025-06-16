@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: medisynth-dev
+  labels:
+    name: medisynth-dev
+    environment: development 

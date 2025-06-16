@@ -9,7 +9,6 @@ resources:
   - portal-deployment.yaml
   - portal-service.yaml
   - api-service.yaml
-  - sqlite-pvc.yaml
   - ingress.yaml
   - admin-secret.yaml
 secretGenerator:

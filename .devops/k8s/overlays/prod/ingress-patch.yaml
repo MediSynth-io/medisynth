@@ -1,0 +1,48 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: medisynth-prod-ingress
+  namespace: medisynth-io
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - portal.medisynth.io
+    - api.medisynth.io
+    - medisynth.io
+    secretName: medisynth-prod-tls
+  rules:
+  - host: portal.medisynth.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: medisynth-portal
+            port:
+              number: 8082
+  - host: api.medisynth.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: medisynth-api
+            port:
+              number: 8080
+  - host: medisynth.io
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: medisynth-portal
+            port:
+              number: 8082 

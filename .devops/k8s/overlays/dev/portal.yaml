@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medisynth-portal-dev
+  namespace: medisynth-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: medisynth-portal-dev
+  template:
+    metadata:
+      labels:
+        app: medisynth-portal-dev
+    spec:
+      containers:
+      - name: portal
+        image: ghcr.io/medisynth-io/medisynth-portal:dev
+        ports:
+        - containerPort: 8082
+        env:
+        - name: MEDISYNTH_DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-dev-secrets
+              key: db-host
+        - name: MEDISYNTH_DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-dev-secrets
+              key: db-port
+        - name: MEDISYNTH_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-dev-secrets
+              key: db-user
+        - name: MEDISYNTH_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-dev-secrets
+              key: db-password
+        - name: MEDISYNTH_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-dev-secrets
+              key: db-name
+        - name: MEDISYNTH_DB_SSL_MODE
+          value: "require"
+        - name: MEDISYNTH_DOMAIN_PORTAL
+          value: "portal-dev.medisynth.io"
+        - name: MEDISYNTH_DOMAIN_API
+          value: "api-dev.medisynth.io"
+        - name: MEDISYNTH_DOMAIN_SECURE
+          value: "true"
+        - name: MEDISYNTH_SESSION_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: medisynth-dev-secrets
+              key: session-secret
+        - name: MEDISYNTH_ADMIN_EMAILS
+          value: "greg@hndrx.co"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: medisynth-portal-dev
+  namespace: medisynth-dev
+spec:
+  selector:
+    app: medisynth-portal-dev
+  ports:
+  - port: 8082
+    targetPort: 8082
+  type: ClusterIP 

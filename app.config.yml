@@ -1,0 +1,73 @@
+# Medisynth Configuration
+# This file contains all configuration settings for the Medisynth application
+
+# API Configuration
+apiPort: 8081  # Port for API service
+apiHost: "0.0.0.0"  # Host to bind API service to
+
+# Database Configuration
+database:
+  path: /data/medisynth.db  # Path to SQLite database
+  socketPath: /data/sqlite.sock  # Path to SQLite socket
+  walMode: true  # Enable Write-Ahead Logging
+  maxRetries: 5  # Maximum number of retries for database operations
+  retryDelay: 5  # Delay between retries in seconds
+
+# Domain Configuration
+domains:
+  portal: portal.medisynth.io  # Portal domain
+  api: api.medisynth.io  # API domain
+  secure: true  # Use HTTPS
+  cookieDomain: .medisynth.io  # Domain for cookies
+  sessionSecret: "${SESSION_SECRET}"  # Secret for session management
+
+# S3 Configuration
+s3:
+  bucket: medisynth-data  # S3 bucket name
+  region: us-east-1  # AWS region
+  endpoint: "${S3_ENDPOINT}"  # S3 endpoint (can be overridden for local development)
+  accessKey: "${S3_ACCESS_KEY}"  # S3 access key
+  secretKey: "${S3_SECRET_KEY}"  # S3 secret key
+
+# Admin Configuration
+admin:
+  email: "${ADMIN_EMAIL}"  # Admin email address
+  password: "${ADMIN_PASSWORD}"  # Admin password (should be changed after first login)
+
+# Security Configuration
+security:
+  cors:
+    allowedOrigins:
+      - https://portal.medisynth.io
+      - https://api.medisynth.io
+      - https://medisynth.io
+    allowedMethods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - OPTIONS
+    allowedHeaders:
+      - Content-Type
+      - Authorization
+    allowCredentials: true
+    maxAge: 86400  # 24 hours
+
+# Logging Configuration
+logging:
+  level: info  # Log level (debug, info, warn, error)
+  format: json  # Log format (json, text)
+  output: stdout  # Log output (stdout, file)
+  file: /var/log/medisynth/app.log  # Log file path (if output is file)
+
+# Rate Limiting
+rateLimit:
+  enabled: true
+  requests: 100  # Number of requests
+  window: 60  # Time window in seconds
+
+# Feature Flags
+features:
+  enablePayment: true
+  enableUserRegistration: true
+  enableAdminPanel: true 

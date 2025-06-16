@@ -1,49 +1,13 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: medisynth-api-ingress
-  namespace: medisynth-io 
+  name: medisynth-ingress
   annotations:
+    kubernetes.io/ingress.class: "nginx"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"    # Timeout for establishing a connection to the backend (seconds)
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"     # Timeout for sending a request to the backend (seconds)
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"     # Timeout for reading a response from the backend (seconds)
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
-  ingressClassName: nginx
   tls:
-  - hosts:
-    - api.medisynth.io 
-    - portal.medisynth.io
-    - medisynth.io
-    secretName: medisynth-api-tls-secret
-  rules:
-  - host: api.medisynth.io 
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: medisynth-api-svc
-            port:
-              name: http
-  - host: portal.medisynth.io
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: medisynth-portal-service
-            port:
-              name: http
-  - host: medisynth.io
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: medisynth-portal-service
-            port:
-              name: http
+  - secretName: medisynth-tls
+  rules: [] 
