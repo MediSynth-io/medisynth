@@ -6,7 +6,6 @@ namespace: medisynth-io
 resources:
   - ../../base
   - namespace.yaml
-  - ingress-patch.yaml
+  - ingress.yaml
 
-patchesStrategicMerge:
-  - ingress-patch.yaml 
+patchesStrategicMerge: [] 

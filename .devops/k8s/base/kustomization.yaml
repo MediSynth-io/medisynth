@@ -9,7 +9,6 @@ resources:
   - portal-deployment.yaml
   - portal-service.yaml
   - api-service.yaml
-  - ingress.yaml
   - admin-secret.yaml
 secretGenerator:
 - name: medisynth-secrets
