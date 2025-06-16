@@ -1,13 +1,15 @@
 package portal
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +20,7 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/bitcoin"
 	"github.com/MediSynth-io/medisynth/internal/database"
 	"github.com/MediSynth-io/medisynth/internal/models"
-	"github.com/MediSynth-io/medisynth/internal/s3"
+	"github.com/google/uuid"
 )
 
 // getRealIP extracts the real client IP from request headers
@@ -534,26 +536,19 @@ func (p *Portal) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleJobs(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(string)
-	if !ok {
-		log.Printf("Error: userID not found in context")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
+	userID := r.Context().Value("userID").(string)
 
-	logRequest(r, "JOBS", "Rendering jobs list")
-
+	// Get jobs from database
 	jobs, err := database.GetJobsByUserID(userID)
 	if err != nil {
-		logRequest(r, "JOBS", "Error getting jobs:", err)
-		http.Error(w, "Could not retrieve job history.", http.StatusInternalServerError)
+		http.Error(w, "Failed to fetch jobs", http.StatusInternalServerError)
 		return
 	}
 
-	data := map[string]interface{}{
+	// Render template
+	p.renderTemplate(w, r, "jobs.html", "Jobs", map[string]interface{}{
 		"Jobs": jobs,
-	}
-	p.renderTemplate(w, r, "jobs.html", "Generation History", data)
+	})
 }
 
 func (p *Portal) handleNewJob(w http.ResponseWriter, r *http.Request) {
@@ -561,80 +556,154 @@ func (p *Portal) handleNewJob(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Portal) handleCreateJob(w http.ResponseWriter, r *http.Request) {
-	logRequest(r, "JOBS", "Attempting to create a new generation job")
+	userID := r.Context().Value("userID").(string)
+
+	// Parse form data
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
 		return
 	}
 
-	// Get all selected modules
-	var keepModules []string
-	if r.FormValue("keepModules") == "all" {
-		// If "all" is selected, use all available modules
-		keepModules = []string{
-			"diabetes", "hypertension", "asthma",
-			"flu", "pneumonia", "uti",
-			"depression", "anxiety", "adhd",
-		}
-	} else {
-		// Otherwise, get individually selected modules
-		keepModules = r.Form["keepModules"]
-	}
+	// Get form values and convert to appropriate types
+	population := toIntPtr(r.FormValue("population"))
+	state := toStringPtr(r.FormValue("state"))
+	outputFormat := toStringPtr(r.FormValue("outputFormat"))
+	keepModules := []string{r.FormValue("keepModules")} // Convert to slice
+	ageMin := toIntPtr(r.FormValue("ageMin"))
+	ageMax := toIntPtr(r.FormValue("ageMax"))
+	city := toStringPtr(r.FormValue("city"))
 
-	params := models.SyntheaParams{
-		Population:   toIntPtr(r.FormValue("population")),
-		Gender:       toStringPtr(r.FormValue("gender")),
-		AgeMin:       toIntPtr(r.FormValue("ageMin")),
-		AgeMax:       toIntPtr(r.FormValue("ageMax")),
-		State:        toStringPtr(r.FormValue("state")),
-		City:         toStringPtr(r.FormValue("city")),
-		OutputFormat: toStringPtr(r.FormValue("outputFormat")),
+	// Create job parameters
+	params := &models.SyntheaParams{
+		Population:   population,
+		State:        state,
+		OutputFormat: outputFormat,
 		KeepModules:  keepModules,
+		AgeMin:       ageMin,
+		AgeMax:       ageMax,
+		City:         city,
 	}
 
-	bodyBytes, err := json.Marshal(params)
+	// Convert parameters to JSON
+	paramsJSON, err := json.Marshal(params)
 	if err != nil {
-		logRequest(r, "JOBS", "Failed to marshal job params:", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		http.Error(w, "Failed to marshal job parameters", http.StatusInternalServerError)
 		return
 	}
 
-	// Use the configured internal API URL to call the API service
-	apiURL := p.config.APIInternalURL + "/generate-patients"
-	logRequest(r, "JOBS", "Proxying job creation request to:", apiURL)
+	// Create job in database
+	job := &models.Job{
+		UserID:         userID,
+		JobID:          uuid.New().String(),
+		Status:         models.JobStatusPending,
+		Parameters:     params,
+		ParametersJSON: paramsJSON,
+		OutputFormat:   outputFormat,
+	}
 
-	// Create the request to the API service
-	apiReq, err := http.NewRequestWithContext(r.Context(), "POST", apiURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		logRequest(r, "JOBS", "Failed to create API request:", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	if err := database.CreateJob(job); err != nil {
+		http.Error(w, "Failed to create job", http.StatusInternalServerError)
 		return
 	}
 
-	// Forward the user's session cookie for authentication with the API
-	if cookie, err := r.Cookie("session"); err == nil {
-		apiReq.AddCookie(cookie)
-	}
-	apiReq.Header.Set("Content-Type", "application/json")
+	// Generate S3 prefix for job output files
+	s3Prefix := fmt.Sprintf("jobs/%s/%s", userID, job.JobID)
+	job.S3Prefix = &s3Prefix
 
-	// Execute the request
-	client := &http.Client{Timeout: 60 * time.Second}
-	apiRes, err := client.Do(apiReq)
-	if err != nil {
-		logRequest(r, "JOBS", "Failed to call API service:", err)
-		http.Error(w, "Failed to start job. Could not contact the data generation service.", http.StatusInternalServerError)
-		return
-	}
-	defer apiRes.Body.Close()
-
-	if apiRes.StatusCode >= 400 {
-		logRequest(r, "JOBS", "API service returned an error status:", apiRes.Status)
-		// Consider reading the body to pass a more specific error message to the user
-		http.Error(w, "Failed to create the data generation job. The API service responded with an error.", apiRes.StatusCode)
+	// Update job with S3 prefix
+	if err := database.UpdateJob(job); err != nil {
+		http.Error(w, "Failed to update job with S3 prefix", http.StatusInternalServerError)
 		return
 	}
 
-	logRequest(r, "JOBS", "Successfully created job via API service")
+	// Start job processing in background
+	go func() {
+		// Update job status to processing
+		job.Status = models.JobStatusProcessing
+		if err := database.UpdateJob(job); err != nil {
+			log.Printf("Failed to update job status to processing: %v", err)
+			return
+		}
+
+		// Create temporary directory for job output
+		tempDir, err := os.MkdirTemp("", fmt.Sprintf("job-%s-*", job.JobID))
+		if err != nil {
+			job.Status = models.JobStatusFailed
+			errMsg := fmt.Sprintf("Failed to create temporary directory: %v", err)
+			job.ErrorMessage = &errMsg
+			database.UpdateJob(job)
+			return
+		}
+		defer os.RemoveAll(tempDir)
+
+		// Run Synthea
+		cmd := exec.Command("java", "-jar", "synthea.jar",
+			"-p", fmt.Sprintf("%d", *population),
+			"-s", *state,
+			"-c", *city,
+			"--exporter.fhir.export=true",
+			"--exporter.fhir.directory="+tempDir,
+		)
+		cmd.Dir = "/app/synthea"
+
+		if err := cmd.Run(); err != nil {
+			job.Status = models.JobStatusFailed
+			errMsg := fmt.Sprintf("Failed to run Synthea: %v", err)
+			job.ErrorMessage = &errMsg
+			database.UpdateJob(job)
+			return
+		}
+
+		// Upload files to S3
+		err = filepath.Walk(tempDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+
+			// Open file
+			file, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			// Generate S3 key
+			relPath, err := filepath.Rel(tempDir, path)
+			if err != nil {
+				return err
+			}
+			s3Key := filepath.Join(*job.S3Prefix, relPath)
+
+			// Upload to S3
+			if err := p.s3Client.UploadFile(r.Context(), s3Key, file); err != nil {
+				return err
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			job.Status = models.JobStatusFailed
+			errMsg := fmt.Sprintf("Failed to upload files to S3: %v", err)
+			job.ErrorMessage = &errMsg
+			database.UpdateJob(job)
+			return
+		}
+
+		// Update job status to completed
+		now := time.Now()
+		job.Status = models.JobStatusCompleted
+		job.CompletedAt = &now
+		if err := database.UpdateJob(job); err != nil {
+			log.Printf("Failed to update job status to completed: %v", err)
+			return
+		}
+	}()
+
+	// Redirect to jobs page
 	http.Redirect(w, r, "/jobs", http.StatusSeeOther)
 }
 
@@ -1075,26 +1144,69 @@ func (p *Portal) handleAdminEditOrderForm(w http.ResponseWriter, r *http.Request
 }
 
 func (p *Portal) handleJobOutputs(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value("userID").(string)
 	jobID := chi.URLParam(r, "jobID")
-	logRequest(r, "JOBS", "Viewing outputs for job:", jobID)
 
-	s3Client, err := s3.NewClient(p.config)
+	// Get job from database
+	job, err := database.GetJobByID(jobID)
 	if err != nil {
-		logRequest(r, "JOBS", "Failed to create S3 client for job", jobID, ":", err)
-		http.Error(w, "Could not access file storage.", http.StatusInternalServerError)
+		http.Error(w, "Job not found", http.StatusNotFound)
 		return
 	}
 
-	files, err := s3Client.ListJobFiles(jobID)
-	if err != nil {
-		logRequest(r, "JOBS", "Failed to list files for job", jobID, ":", err)
-		http.Error(w, "Could not retrieve job files.", http.StatusInternalServerError)
+	// Check if user owns the job
+	if job.UserID != userID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
+	// Check if job has S3 prefix
+	if job.S3Prefix == nil {
+		http.Error(w, "Job outputs not available", http.StatusNotFound)
+		return
+	}
+
+	// List files in S3
+	files, err := p.s3Client.ListFiles(r.Context(), *job.S3Prefix)
+	if err != nil {
+		http.Error(w, "Failed to list job outputs", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate presigned URLs for each file
+	type FileInfo struct {
+		Name    string
+		Size    int64
+		URL     string
+		Expires time.Time
+	}
+
+	var fileInfos []FileInfo
+	for _, file := range files {
+		// Get file size
+		size, err := p.s3Client.GetFileSize(r.Context(), file)
+		if err != nil {
+			continue
+		}
+
+		// Generate presigned URL
+		url, err := p.s3Client.GetFileURL(r.Context(), file, 1*time.Hour)
+		if err != nil {
+			continue
+		}
+
+		fileInfos = append(fileInfos, FileInfo{
+			Name:    filepath.Base(file),
+			Size:    size,
+			URL:     url,
+			Expires: time.Now().Add(1 * time.Hour),
+		})
+	}
+
+	// Render template
 	p.renderTemplate(w, r, "job-outputs.html", "Job Outputs", map[string]interface{}{
-		"JobID": jobID,
-		"Files": files,
+		"Job":   job,
+		"Files": fileInfos,
 	})
 }
 
@@ -1103,4 +1215,18 @@ func (p *Portal) handlePrivacyPolicy(w http.ResponseWriter, r *http.Request) {
 		"LastUpdated": time.Now().Format("January 2, 2006"),
 	}
 	p.renderTemplate(w, r, "privacy-policy.html", "Privacy Policy", data)
+}
+
+// humanizeBytes formats a byte size into a human-readable string
+func humanizeBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }

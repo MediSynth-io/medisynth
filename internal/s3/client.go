@@ -2,6 +2,8 @@ package s3
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log"
 	"path/filepath"
 	"strings"
@@ -115,4 +117,44 @@ func extractFilename(s3Key string) string {
 func (c *Client) ListJobFiles(jobID string) ([]models.JobFile, error) {
 	prefix := "synthea_output/" + jobID + "/"
 	return c.ListFiles(context.TODO(), prefix)
+}
+
+// UploadFile uploads a file to S3
+func (c *Client) UploadFile(ctx context.Context, key string, body io.Reader) error {
+	_, err := c.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: &c.BucketName,
+		Key:    &key,
+		Body:   body,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to upload file to S3: %w", err)
+	}
+	return nil
+}
+
+// GetFileSize gets the size of a file in S3
+func (c *Client) GetFileSize(ctx context.Context, key string) (int64, error) {
+	result, err := c.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: &c.BucketName,
+		Key:    &key,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get file size from S3: %w", err)
+	}
+	return result.ContentLength, nil
+}
+
+// GetFileURL generates a presigned URL for downloading a file
+func (c *Client) GetFileURL(ctx context.Context, key string, expires time.Duration) (string, error) {
+	presignClient := s3.NewPresignClient(c.Client)
+	presignedURL, err := presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: &c.BucketName,
+		Key:    &key,
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = expires
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+	return presignedURL.URL, nil
 }

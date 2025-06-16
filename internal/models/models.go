@@ -164,6 +164,7 @@ type Job struct {
 	OutputSize     *int64         `json:"output_size" db:"output_size"`
 	PatientCount   *int           `json:"patient_count" db:"patient_count"`
 	ErrorMessage   *string        `json:"error_message" db:"error_message"`
+	S3Prefix       *string        `json:"s3_prefix" db:"s3_prefix"` // S3 prefix for job output files
 	CreatedAt      time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt      time.Time      `json:"updated_at" db:"updated_at"`
 	CompletedAt    *time.Time     `json:"completed_at" db:"completed_at"`
@@ -175,6 +176,7 @@ type JobFile struct {
 	Size      int64     `json:"size"`
 	Timestamp time.Time `json:"timestamp"`
 	URL       string    `json:"url"`
+	S3Key     string    `json:"s3_key"` // S3 key for the file
 }
 
 // --- Helper Methods ---

@@ -1,0 +1,3 @@
+ALTER TABLE jobs
+DROP COLUMN IF EXISTS output_size,
+DROP COLUMN IF EXISTS s3_prefix; 

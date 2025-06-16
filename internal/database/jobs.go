@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -71,14 +72,14 @@ func GetJobByID(id string) (*models.Job, error) {
 	return job, nil
 }
 
-// GetJobsByUserID retrieves all jobs for a user
+// GetJobsByUserID gets all jobs for a user
 func GetJobsByUserID(userID string) ([]*models.Job, error) {
-	var query string
-	if dbType == "postgres" {
-		query = "SELECT id, user_id, job_id, status, parameters, output_format, output_path, patient_count, error_message, created_at, completed_at FROM jobs WHERE user_id = $1 ORDER BY created_at DESC"
-	} else {
-		query = "SELECT id, user_id, job_id, status, parameters, output_format, output_path, patient_count, error_message, created_at, completed_at FROM jobs WHERE user_id = ? ORDER BY created_at DESC"
-	}
+	query := `
+		SELECT id, user_id, job_id, status, parameters, output_format, output_path, output_size, patient_count, error_message, s3_prefix, created_at, updated_at, completed_at
+		FROM jobs
+		WHERE user_id = $1
+		ORDER BY created_at DESC
+	`
 
 	rows, err := dbConn.Query(query, userID)
 	if err != nil {
@@ -88,25 +89,66 @@ func GetJobsByUserID(userID string) ([]*models.Job, error) {
 
 	var jobs []*models.Job
 	for rows.Next() {
-		job := &models.Job{}
-		err := rows.Scan(
-			&job.ID, &job.UserID, &job.JobID, &job.Status, &job.ParametersJSON, &job.OutputFormat,
-			&job.OutputPath, &job.PatientCount, &job.ErrorMessage, &job.CreatedAt, &job.CompletedAt,
-		)
-		if err != nil {
+		var job models.Job
+		if err := rows.Scan(
+			&job.ID,
+			&job.UserID,
+			&job.JobID,
+			&job.Status,
+			&job.ParametersJSON,
+			&job.OutputFormat,
+			&job.OutputPath,
+			&job.OutputSize,
+			&job.PatientCount,
+			&job.ErrorMessage,
+			&job.S3Prefix,
+			&job.CreatedAt,
+			&job.UpdatedAt,
+			&job.CompletedAt,
+		); err != nil {
 			return nil, err
 		}
 
-		if err := job.UnmarshalParameters(); err != nil {
-			log.Printf("Warning: could not unmarshal params for job %s: %v", job.ID, err)
+		// Parse parameters JSON
+		if err := json.Unmarshal(job.ParametersJSON, &job.Parameters); err != nil {
+			return nil, err
 		}
 
-		jobs = append(jobs, job)
-	}
-
-	if err = rows.Err(); err != nil {
-		return nil, err
+		jobs = append(jobs, &job)
 	}
 
 	return jobs, nil
+}
+
+// UpdateJob updates a job in the database
+func UpdateJob(job *models.Job) error {
+	query := `
+		UPDATE jobs
+		SET status = $1,
+			parameters = $2,
+			output_format = $3,
+			output_path = $4,
+			output_size = $5,
+			patient_count = $6,
+			error_message = $7,
+			s3_prefix = $8,
+			updated_at = CURRENT_TIMESTAMP,
+			completed_at = $9
+		WHERE id = $10
+	`
+
+	_, err := dbConn.Exec(query,
+		job.Status,
+		job.ParametersJSON,
+		job.OutputFormat,
+		job.OutputPath,
+		job.OutputSize,
+		job.PatientCount,
+		job.ErrorMessage,
+		job.S3Prefix,
+		job.CompletedAt,
+		job.ID,
+	)
+
+	return err
 }

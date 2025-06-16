@@ -1,62 +1,100 @@
 {{define "title"}}Job Outputs{{end}}
 
 {{define "content"}}
-<div class="space-y-6">
-    <!-- Header -->
-    <div>
-        <a href="/jobs" class="text-indigo-600 hover:text-indigo-800 font-medium">
-            &larr; Back to Jobs
-        </a>
-        <h1 class="text-3xl font-bold text-gray-900 mt-2">Job Outputs</h1>
-        <p class="mt-1 text-gray-600">Download the generated files for job: <span class="font-mono bg-gray-100 p-1 rounded">{{.JobID}}</span></p>
-    </div>
+<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+    <div class="px-4 py-6 sm:px-0">
+        <div class="border-4 border-dashed border-gray-200 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-4">
+                <h1 class="text-2xl font-semibold text-gray-900">Job Outputs</h1>
+                <a href="/jobs" class="text-indigo-600 hover:text-indigo-900">
+                    &larr; Back to Jobs
+                </a>
+            </div>
+            
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
+                <div class="px-4 py-5 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Job Details</h3>
+                </div>
+                <div class="border-t border-gray-200">
+                    <dl>
+                        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">Status</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    {{if eq .Job.Status "completed"}}
+                                        bg-green-100 text-green-800
+                                    {{else if eq .Job.Status "failed"}}
+                                        bg-red-100 text-red-800
+                                    {{else if eq .Job.Status "processing"}}
+                                        bg-yellow-100 text-yellow-800
+                                    {{else}}
+                                        bg-gray-100 text-gray-800
+                                    {{end}}
+                                ">
+                                    {{.Job.Status}}
+                                </span>
+                            </dd>
+                        </div>
+                        <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">Created</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{.Job.CreatedAt.Format "2006-01-02 15:04:05"}}</dd>
+                        </div>
+                        {{if .Job.CompletedAt}}
+                        <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-gray-500">Completed</dt>
+                            <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{.Job.CompletedAt.Format "2006-01-02 15:04:05"}}</dd>
+                        </div>
+                        {{end}}
+                        {{if .Job.ErrorMessage}}
+                        <div class="bg-red-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                            <dt class="text-sm font-medium text-red-500">Error</dt>
+                            <dd class="mt-1 text-sm text-red-900 sm:mt-0 sm:col-span-2">{{.Job.ErrorMessage}}</dd>
+                        </div>
+                        {{end}}
+                    </dl>
+                </div>
+            </div>
 
-    <!-- Files Table -->
-    <div class="bg-white shadow-sm rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-                <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filename</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Modified</th>
-                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Download</span></th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-                {{range .Files}}
-                <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        <div class="flex items-center">
-                            <svg class="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                            {{.Name}}
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{.Size | humanizeBytes}}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {{.Timestamp.Format "Jan 2, 2006 3:04 PM"}}
-                    </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <a href="{{.URL}}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" download>
-                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                            Download
-                        </a>
-                    </td>
-                </tr>
-                {{else}}
-                <tr>
-                    <td colspan="4" class="px-6 py-12 text-center text-gray-500">
-                        <div class="flex flex-col items-center">
-                            <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
-                            <p class="mt-4 text-lg">No output files found for this job.</p>
-                            <p class="mt-1 text-sm">The job may still be running or it might have failed.</p>
-                        </div>
-                    </td>
-                </tr>
-                {{end}}
-            </tbody>
-        </table>
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div class="px-4 py-5 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Output Files</h3>
+                </div>
+                <div class="border-t border-gray-200">
+                    <ul class="divide-y divide-gray-200">
+                        {{range .Files}}
+                        <li class="px-4 py-4 sm:px-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center">
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium text-gray-900">{{.Name}}</p>
+                                        <p class="text-sm text-gray-500">{{humanizeBytes .Size}}</p>
+                                    </div>
+                                </div>
+                                <div class="ml-4 flex-shrink-0">
+                                    <a href="{{.URL}}" class="font-medium text-indigo-600 hover:text-indigo-500" target="_blank">
+                                        Download
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">Link expires at {{.Expires.Format "15:04:05"}}</p>
+                            </div>
+                        </li>
+                        {{else}}
+                        <li class="px-4 py-12 text-center text-gray-500">
+                            <div class="flex flex-col items-center">
+                                <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                                </svg>
+                                <p class="mt-4 text-lg">No output files found</p>
+                                <p class="mt-1 text-sm">The job may still be running or it might have failed.</p>
+                            </div>
+                        </li>
+                        {{end}}
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {{end}} 

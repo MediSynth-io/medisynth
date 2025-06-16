@@ -15,12 +15,14 @@ import (
 	"github.com/MediSynth-io/medisynth/internal/auth"
 	"github.com/MediSynth-io/medisynth/internal/config"
 	"github.com/MediSynth-io/medisynth/internal/database"
+	"github.com/MediSynth-io/medisynth/internal/s3"
 	"github.com/go-chi/chi/v5"
 )
 
 type Portal struct {
 	templates map[string]*template.Template
 	config    *config.Config
+	s3Client  *s3.Client
 }
 
 var funcMap = template.FuncMap{
@@ -82,9 +84,16 @@ func New(cfg *config.Config) (*Portal, error) {
 		return nil, fmt.Errorf("failed to load templates: %w", err)
 	}
 
+	// Create S3 client
+	s3Client, err := s3.NewClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create S3 client: %w", err)
+	}
+
 	return &Portal{
 		templates: templates,
 		config:    cfg,
+		s3Client:  s3Client,
 	}, nil
 }
 
@@ -298,4 +307,30 @@ func (p *Portal) adminNavMiddleware(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), "adminNav", nav)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (p *Portal) renderTemplate(w http.ResponseWriter, r *http.Request, templateName string, title string, data interface{}) {
+	tmpl, err := template.New(templateName).Funcs(template.FuncMap{
+		"humanizeBytes": func(bytes int64) string {
+			if bytes < 1024 {
+				return fmt.Sprintf("%d B", bytes)
+			}
+			if bytes < 1024*1024 {
+				return fmt.Sprintf("%.2f KB", float64(bytes)/1024)
+			}
+			if bytes < 1024*1024*1024 {
+				return fmt.Sprintf("%.2f MB", float64(bytes)/(1024*1024))
+			}
+			return fmt.Sprintf("%.2f GB", float64(bytes)/(1024*1024*1024))
+		},
+	}).ParseFiles(
+		"templates/portal/"+templateName,
+		"templates/portal/base.html",
+	)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// ... rest of the function ...
 }
