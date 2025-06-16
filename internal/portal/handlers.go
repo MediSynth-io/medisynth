@@ -803,12 +803,30 @@ func (p *Portal) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 	logRequest(r, "ADMIN", "Viewing user management page")
+
+	// Log database connection status
+	dbConn := database.GetConnection()
+	if dbConn == nil {
+		logRequest(r, "ADMIN", "Database connection is nil")
+		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+
+	// Test database connection
+	if err := dbConn.Ping(); err != nil {
+		logRequest(r, "ADMIN", "Database ping failed:", err)
+		http.Error(w, "Database connection error", http.StatusInternalServerError)
+		return
+	}
+
 	users, err := database.GetAllUsers()
 	if err != nil {
 		logRequest(r, "ADMIN", "Error getting all users:", err)
 		http.Error(w, "Failed to retrieve users.", http.StatusInternalServerError)
 		return
 	}
+
+	logRequest(r, "ADMIN", "Successfully retrieved", len(users), "users")
 	p.renderAdminTemplate(w, r, "admin-users.html", "Users", map[string]interface{}{
 		"Data": map[string]interface{}{
 			"Users": users,

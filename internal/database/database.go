@@ -608,6 +608,8 @@ func MakeUserAdmin(userID string) error {
 
 // GetAllUsers retrieves all users (admin only)
 func GetAllUsers() ([]models.User, error) {
+	log.Printf("[DB] Getting all users")
+
 	var query string
 	if dbType == "postgres" {
 		query = "SELECT id, email, is_admin, state, force_password_reset, created_at, updated_at, last_login FROM users ORDER BY created_at DESC"
@@ -615,8 +617,11 @@ func GetAllUsers() ([]models.User, error) {
 		query = "SELECT id, email, is_admin, state, force_password_reset, created_at, updated_at, last_login FROM users ORDER BY created_at DESC"
 	}
 
+	log.Printf("[DB] Executing query: %s", query)
+
 	rows, err := dbConn.Query(query)
 	if err != nil {
+		log.Printf("[DB] Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -625,10 +630,18 @@ func GetAllUsers() ([]models.User, error) {
 	for rows.Next() {
 		user := models.User{}
 		if err := rows.Scan(&user.ID, &user.Email, &user.IsAdmin, &user.State, &user.ForcePasswordReset, &user.CreatedAt, &user.UpdatedAt, &user.LastLogin); err != nil {
+			log.Printf("[DB] Error scanning row: %v", err)
 			return nil, err
 		}
 		users = append(users, user)
 	}
+
+	if err = rows.Err(); err != nil {
+		log.Printf("[DB] Error iterating rows: %v", err)
+		return nil, err
+	}
+
+	log.Printf("[DB] Successfully retrieved %d users", len(users))
 	return users, nil
 }
 
