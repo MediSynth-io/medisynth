@@ -7,5 +7,28 @@ RUN CGO_ENABLED=1 go build -o /app/medisynth-api ./cmd/api/main.go
 # Use a debian-based image for the final stage
 FROM debian:stable-slim
 WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    openjdk-17-jre \
+    curl \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Synthea
+RUN curl -L https://github.com/synthetichealth/synthea/releases/download/master-branch-latest/synthea-with-dependencies.jar -o /app/synthea.jar
+
+# Create a wrapper script for Synthea
+RUN echo '#!/bin/bash\njava -jar /app/synthea.jar "$@"' > /app/synthea && \
+    chmod +x /app/synthea
+
+# Add Synthea to PATH
+ENV PATH="/app:${PATH}"
+
+# Copy the API binary
 COPY --from=builder /app/medisynth-api /app/medisynth-api
+
+# Create directory for Synthea output
+RUN mkdir -p /tmp/synthea-output && chmod 777 /tmp/synthea-output
+
 CMD ["./medisynth-api"] 
