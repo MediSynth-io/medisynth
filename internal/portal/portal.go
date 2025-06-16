@@ -299,3 +299,18 @@ func (p *Portal) adminNavMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+func (p *Portal) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := database.GetAllUsers()
+	if err != nil {
+		log.Printf("[ADMIN_USERS] Failed to fetch users: %v", err)
+		p.renderTemplate(w, r, "error.html", "Error", map[string]interface{}{
+			"Error": "Failed to retrieve users",
+		})
+		return
+	}
+
+	p.renderTemplate(w, r, "admin-users.html", "User Management", map[string]interface{}{
+		"Users": users,
+	})
+}
