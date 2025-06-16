@@ -136,6 +136,13 @@ func getPostgresMigrations() []Migration {
 			Description: "Add force password reset to users",
 			SQL:         "ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT FALSE;",
 		},
+		{
+			Version:     9,
+			Description: "Add state and last_login to users",
+			SQL: `ALTER TABLE users 
+				ADD COLUMN state VARCHAR(50) NOT NULL DEFAULT 'active',
+				ADD COLUMN last_login TIMESTAMP WITH TIME ZONE;`,
+		},
 	}
 }
 
@@ -256,6 +263,13 @@ func getSQLiteMigrations() []Migration {
 			Description: "Add force password reset to users",
 			SQL:         "ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT 0;",
 		},
+		{
+			Version:     9,
+			Description: "Add state and last_login to users",
+			SQL: `ALTER TABLE users 
+				ADD COLUMN state TEXT NOT NULL DEFAULT 'active',
+				ADD COLUMN last_login DATETIME;`,
+		},
 	}
 }
 
@@ -313,52 +327,46 @@ func recordMigration(db *sql.DB, dbType string, version int) error {
 
 // RunMigrations runs all pending migrations
 func RunMigrations(db *sql.DB, dbType string) error {
-	log.Printf("=== RUNNING DATABASE MIGRATIONS ===")
+	log.Printf("Running database migrations...")
 
-	// Create migrations table
-	if err := createMigrationsTable(db, dbType); err != nil {
-		return fmt.Errorf("failed to create migrations table: %v", err)
+	// Add is_admin column if it doesn't exist
+	if err := addIsAdminColumn(db, dbType); err != nil {
+		return fmt.Errorf("failed to add is_admin column: %v", err)
 	}
 
-	// Get applied migrations
-	applied, err := getAppliedMigrations(db)
+	// Add state, force_password_reset, and last_login columns to users table
+	var addColumnsQuery string
+	if dbType == "postgres" {
+		addColumnsQuery = `
+			DO $$ 
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'state') THEN
+					ALTER TABLE users ADD COLUMN state VARCHAR(50) NOT NULL DEFAULT 'active';
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'force_password_reset') THEN
+					ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT FALSE;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'last_login') THEN
+					ALTER TABLE users ADD COLUMN last_login TIMESTAMP WITH TIME ZONE;
+				END IF;
+			END $$;
+		`
+	} else {
+		addColumnsQuery = `
+			ALTER TABLE users ADD COLUMN state VARCHAR(50) NOT NULL DEFAULT 'active';
+			ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT FALSE;
+			ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
+		`
+	}
+
+	_, err := db.Exec(addColumnsQuery)
 	if err != nil {
-		return fmt.Errorf("failed to get applied migrations: %v", err)
+		// Ignore "duplicate column" errors
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("failed to add columns to users table: %v", err)
+		}
 	}
 
-	// Get all migrations
-	migrations := GetMigrations(dbType)
-
-	// Apply pending migrations
-	for _, migration := range migrations {
-		if applied[migration.Version] {
-			log.Printf("Migration %d already applied: %s", migration.Version, migration.Description)
-			continue
-		}
-
-		log.Printf("Applying migration %d: %s", migration.Version, migration.Description)
-
-		// Split SQL by semicolon and execute each statement
-		statements := strings.Split(migration.SQL, ";")
-		for _, stmt := range statements {
-			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
-
-			if _, err := db.Exec(stmt); err != nil {
-				return fmt.Errorf("failed to apply migration %d: %v", migration.Version, err)
-			}
-		}
-
-		// Record migration as applied
-		if err := recordMigration(db, dbType, migration.Version); err != nil {
-			return fmt.Errorf("failed to record migration %d: %v", migration.Version, err)
-		}
-
-		log.Printf("Successfully applied migration %d", migration.Version)
-	}
-
-	log.Printf("=== MIGRATIONS COMPLETE ===")
+	log.Printf("Database migrations completed successfully")
 	return nil
 }
