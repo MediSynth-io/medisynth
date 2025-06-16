@@ -1,15 +1,21 @@
-# Use Go 1.23 for the build stage
-FROM golang:1.23 AS builder
+# Use Go 1.21 for the build stage
+FROM golang:1.21 as builder
 WORKDIR /app
 COPY . .
+
+# Download dependencies first
+RUN go mod download
+
+# Build the application
 RUN CGO_ENABLED=1 go build -o /app/medisynth-api ./cmd/api/main.go
 
 # Use a debian-based image for the final stage
-FROM debian:stable-slim
+FROM debian:bullseye-slim
 WORKDIR /app
 
-# Install dependencies
+# Install required system packages
 RUN apt-get update && apt-get install -y \
+    ca-certificates \
     openjdk-17-jre \
     curl \
     unzip \
@@ -28,7 +34,17 @@ ENV PATH="/app:${PATH}"
 # Copy the API binary
 COPY --from=builder /app/medisynth-api /app/medisynth-api
 
+# Copy any other necessary files
+COPY --from=builder /app/config /app/config
+COPY --from=builder /app/migrations /app/migrations
+
 # Create directory for Synthea output
 RUN mkdir -p /tmp/synthea-output && chmod 777 /tmp/synthea-output
 
-CMD ["./medisynth-api"] 
+# Set environment variables
+ENV PORT=8080
+
+# Expose the port
+EXPOSE 8080
+
+CMD ["/app/medisynth-api"] 
