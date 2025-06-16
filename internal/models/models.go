@@ -30,7 +30,7 @@ type User struct {
 	ForcePasswordReset bool         `json:"force_password_reset" db:"force_password_reset"`
 	CreatedAt          time.Time    `json:"created_at" db:"created_at"`
 	UpdatedAt          time.Time    `json:"updated_at" db:"updated_at"`
-	LastLogin          time.Time    `json:"last_login" db:"last_login"`
+	LastLogin          *time.Time   `json:"last_login" db:"last_login"`
 }
 
 // NewUser creates a new user with a hashed password
