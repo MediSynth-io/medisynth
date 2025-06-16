@@ -40,9 +40,9 @@
                             <div class="sm:col-span-2">
                                 <label for="age" class="block text-sm font-medium text-gray-700">Age Range</label>
                                 <div class="flex items-center mt-1">
-                                    <input type="number" name="ageMin" id="ageMin" placeholder="Min" min="0" max="120" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <input type="number" name="ageMin" id="ageMin" value="20" min="0" max="120" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
                                     <span class="mx-2 text-gray-500">-</span>
-                                    <input type="number" name="ageMax" id="ageMax" placeholder="Max" min="0" max="120" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                    <input type="number" name="ageMax" id="ageMax" value="40" min="0" max="120" class="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
                                 </div>
                                 <p class="mt-1 text-sm text-gray-500">Leave empty for all ages</p>
                             </div>
@@ -63,7 +63,7 @@
 
                             <div class="sm:col-span-3">
                                 <label for="city" class="block text-sm font-medium text-gray-700">City (Optional)</label>
-                                <input type="text" name="city" id="city" placeholder="e.g. Boston" class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
+                                <input type="text" name="city" id="city" value="Boston" class="mt-1 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md">
                                 <p class="mt-1 text-sm text-gray-500">Leave empty for state-wide distribution</p>
                             </div>
                         </div>
@@ -77,7 +77,7 @@
                         <div class="mt-6">
                             <div class="space-y-4">
                                 <div class="flex items-center">
-                                    <input type="checkbox" name="keepModules" value="all" id="allModules" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                                    <input type="checkbox" name="keepModules" value="all" id="allModules" checked class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                                     <label for="allModules" class="ml-3 block text-sm font-medium text-gray-700">Include All Conditions</label>
                                 </div>
                                 
