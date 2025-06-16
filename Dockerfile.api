@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
 RUN curl -L https://github.com/synthetichealth/synthea/releases/download/master-branch-latest/synthea-with-dependencies.jar -o /app/synthea.jar
 
 # Create a wrapper script for Synthea
-RUN echo '#!/bin/bash\njava -jar /app/synthea.jar "$@"' > /app/synthea && \
+RUN echo '#!/bin/bash\njava -jar /app/synthea.jar run_synthea "$@"' > /app/synthea && \
     chmod +x /app/synthea
 
 # Add Synthea to PATH
