@@ -3,8 +3,8 @@ FROM golang:1.23 AS builder
 WORKDIR /app
 COPY . .
 
-# Download dependencies first
-RUN go mod download
+# Download and tidy dependencies
+RUN go mod tidy && go mod download
 
 # Build the application
 RUN CGO_ENABLED=1 go build -o /app/medisynth-api ./cmd/api/main.go
@@ -42,9 +42,9 @@ COPY --from=builder /app/migrations /app/migrations
 RUN mkdir -p /tmp/synthea-output && chmod 777 /tmp/synthea-output
 
 # Set environment variables
-ENV PORT=8080
+ENV PORT=8081
 
 # Expose the port
-EXPOSE 8080
+EXPOSE 8081
 
 CMD ["/app/medisynth-api"] 
