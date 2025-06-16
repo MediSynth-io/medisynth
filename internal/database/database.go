@@ -372,7 +372,7 @@ func initSchema(db *sql.DB, dbType string) error {
 func runMigrations(db *sql.DB, dbType string) error {
 	log.Printf("Running database migrations...")
 
-	// Migration 1: Add is_admin column if it doesn't exist
+	// Add is_admin column if it doesn't exist
 	if err := addIsAdminColumn(db, dbType); err != nil {
 		return fmt.Errorf("failed to add is_admin column: %v", err)
 	}
@@ -1509,50 +1509,5 @@ func UpdateUserState(userID string, state models.AccountState) error {
 		return sql.ErrNoRows
 	}
 
-	return nil
-}
-
-func RunMigrations(db *sql.DB, dbType string) error {
-	log.Printf("Running database migrations...")
-
-	// Add is_admin column if it doesn't exist
-	if err := addIsAdminColumn(db, dbType); err != nil {
-		return fmt.Errorf("failed to add is_admin column: %v", err)
-	}
-
-	// Add state, force_password_reset, and last_login columns to users table
-	var addColumnsQuery string
-	if dbType == "postgres" {
-		addColumnsQuery = `
-			DO $$ 
-			BEGIN
-				IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'state') THEN
-					ALTER TABLE users ADD COLUMN state VARCHAR(50) NOT NULL DEFAULT 'active';
-				END IF;
-				IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'force_password_reset') THEN
-					ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT FALSE;
-				END IF;
-				IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'last_login') THEN
-					ALTER TABLE users ADD COLUMN last_login TIMESTAMP WITH TIME ZONE;
-				END IF;
-			END $$;
-		`
-	} else {
-		addColumnsQuery = `
-			ALTER TABLE users ADD COLUMN state VARCHAR(50) NOT NULL DEFAULT 'active';
-			ALTER TABLE users ADD COLUMN force_password_reset BOOLEAN NOT NULL DEFAULT FALSE;
-			ALTER TABLE users ADD COLUMN last_login TIMESTAMP;
-		`
-	}
-
-	_, err := db.Exec(addColumnsQuery)
-	if err != nil {
-		// Ignore "duplicate column" errors
-		if !strings.Contains(err.Error(), "duplicate column") {
-			return fmt.Errorf("failed to add columns to users table: %v", err)
-		}
-	}
-
-	log.Printf("Database migrations completed successfully")
 	return nil
 }
