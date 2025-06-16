@@ -3,11 +3,16 @@ FROM golang:1.23 AS builder
 WORKDIR /app
 COPY . .
 
+# Set GOPATH and module path
+ENV GOPATH=/go
+ENV GO111MODULE=on
+ENV CGO_ENABLED=1
+
 # Download and tidy dependencies
-RUN go mod tidy && go mod download
+RUN go mod download
 
 # Build the application
-RUN CGO_ENABLED=1 go build -o /app/medisynth-api ./cmd/api/main.go
+RUN go build -o /app/medisynth-api ./cmd/api/main.go
 
 # Use a debian-based image for the final stage
 FROM debian:bullseye-slim
