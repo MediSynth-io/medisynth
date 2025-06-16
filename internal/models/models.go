@@ -222,11 +222,13 @@ func (j *Job) GetSyntheaArgs() ([]string, error) {
 	if j.Parameters.AgeMin != nil && j.Parameters.AgeMax != nil {
 		args = append(args, "-a", fmt.Sprintf("%d-%d", *j.Parameters.AgeMin, *j.Parameters.AgeMax))
 	}
+
+	// Add state and city as positional arguments
 	if j.Parameters.State != nil {
-		args = append(args, "-s", *j.Parameters.State)
-	}
-	if j.Parameters.City != nil {
-		args = append(args, "--city", *j.Parameters.City)
+		args = append(args, *j.Parameters.State)
+		if j.Parameters.City != nil {
+			args = append(args, *j.Parameters.City)
+		}
 	}
 
 	return args, nil
